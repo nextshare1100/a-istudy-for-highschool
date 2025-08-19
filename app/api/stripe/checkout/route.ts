@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     console.log('Environment check:', {
       hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
       priceIdMonthly: process.env.STRIPE_PRICE_MONTHLY_ID,
+      priceIdSetupFee: process.env.STRIPE_PRICE_SETUP_FEE_ID,
       appUrl: process.env.NEXT_PUBLIC_APP_URL,
     });
 
@@ -67,32 +68,36 @@ export async function POST(request: NextRequest) {
       console.log('New customer created:', customerId);
     }
 
-    // 価格IDの取得（現在は月額プランのみ）
-    const priceId = process.env.STRIPE_PRICE_MONTHLY_ID;
+    // 価格IDの取得
+    const monthlyPriceId = process.env.STRIPE_PRICE_MONTHLY_ID;
+    const setupFeePriceId = process.env.STRIPE_PRICE_SETUP_FEE_ID;
     
-    if (!priceId) {
-      console.error('Price ID is not defined!');
+    if (!monthlyPriceId || !setupFeePriceId) {
+      console.error('Price IDs are not defined!');
       return NextResponse.json(
         { error: '料金プランが設定されていません' },
         { status: 500 }
       );
     }
     
-    console.log('Using price ID:', priceId);
+    console.log('Using price IDs:', { monthlyPriceId, setupFeePriceId });
 
     // 開発環境と本番環境でURLを切り替え
     const baseUrl = process.env.NODE_ENV === 'development' 
       ? 'http://localhost:3000' 
       : process.env.NEXT_PUBLIC_APP_URL;
 
+    // 基本的なラインアイテム（月額プラン）
+    const lineItems = [{
+      price: monthlyPriceId,
+      quantity: 1,
+    }];
+
     // チェックアウトセッションのパラメータ
     const sessionParams: any = {
       customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{
-        price: priceId,
-        quantity: 1,
-      }],
+      line_items: lineItems,
       mode: 'subscription',
       success_url: `${baseUrl}/subscription/register?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/subscription/register?canceled=true`,
@@ -120,15 +125,24 @@ export async function POST(request: NextRequest) {
     };
 
     // キャンペーンコードの処理
+    let isTrialApplied = false;
+    
     if (campaignCode && campaignCode.trim()) {
       const normalizedCode = campaignCode.trim().toUpperCase();
       console.log('Checking campaign code:', normalizedCode);
       
-      // 特別なキャンペーンコード「AISTUDY2024」の場合
-      if (normalizedCode === 'AISTUDY2024') {
+      // 特別なキャンペーンコード「AISTUDYTRIAL」の場合
+      if (normalizedCode === 'AISTUDYTRIAL') {
         // 30日間の無料トライアルを設定
         sessionParams.subscription_data.trial_period_days = 30;
         sessionParams.subscription_data.metadata.campaignCode = normalizedCode;
+        isTrialApplied = true;
+        console.log('Applied 30-day trial for AISTUDYTRIAL');
+      } else if (normalizedCode === 'AISTUDY2024') {
+        // 旧キャンペーンコードもサポート（互換性のため）
+        sessionParams.subscription_data.trial_period_days = 30;
+        sessionParams.subscription_data.metadata.campaignCode = normalizedCode;
+        isTrialApplied = true;
         console.log('Applied 30-day trial for AISTUDY2024');
       } else {
         // その他のStripeクーポンコード
@@ -151,8 +165,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // トライアルが適用されていない場合のみ、初回登録料を追加
+    if (!isTrialApplied) {
+      lineItems.push({
+        price: setupFeePriceId,
+        quantity: 1,
+      });
+      console.log('Added setup fee to line items');
+    }
+
+    // ラインアイテムを更新
+    sessionParams.line_items = lineItems;
+
     // チェックアウトセッションを作成
-    console.log('Creating checkout session with locale:', sessionParams.locale);
+    console.log('Creating checkout session with params:', {
+      ...sessionParams,
+      line_items: lineItems.map(item => ({
+        price: item.price,
+        quantity: item.quantity
+      }))
+    });
+    
     const session = await stripe.checkout.sessions.create(sessionParams);
     console.log('Checkout session created:', session.id);
     console.log('Session URL:', session.url);
