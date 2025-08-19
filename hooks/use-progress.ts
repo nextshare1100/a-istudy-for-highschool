@@ -8,7 +8,7 @@ import {
   Unsubscribe 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@clerk/nextjs';
+
 import { differenceInDays, startOfWeek, endOfWeek } from 'date-fns';
 
 interface ProgressData {
