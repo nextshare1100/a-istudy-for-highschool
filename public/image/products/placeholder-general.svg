@@ -1,0 +1,13 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#f5f5f5"/>
+  
+  <!-- ボックス -->
+  <g transform="translate(50, 50)">
+    <rect x="0" y="30" width="100" height="70" fill="#ddd" rx="5"/>
+    <polygon points="0,30 50,0 150,0 100,30" fill="#bbb"/>
+    <polygon points="100,30 150,0 150,70 100,100" fill="#999"/>
+  </g>
+  
+  <!-- クエスチョンマーク -->
+  <text x="100" y="110" font-family="Arial" font-size="40" fill="#888" text-anchor="middle">?</text>
+</svg>

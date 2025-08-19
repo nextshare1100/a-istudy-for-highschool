@@ -1,0 +1,503 @@
+// app/(dashboard)/schedule/page.tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Calendar, Target, Clock, AlertCircle, TrendingUp, Play, Settings, FileText, Bell, Sparkles, RefreshCw } from 'lucide-react'
+import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuth } from '@/hooks/use-auth'
+
+
+interface Schedule {
+  id: string
+  targetDate: string
+  targetScore: number
+  currentScore: number
+  status: 'on_track' | 'slightly_behind' | 'behind'
+  progress: {
+    totalDays: number
+    elapsedDays: number
+    remainingDays: number
+    totalStudyHours: number
+    expectedHours: number
+    percentage: number
+  }
+  monthlyGoals: {
+    id: string
+    month: number
+    year: number
+    totalHours: number
+    subjectGoals: {
+      subject: string
+      targetHours: number
+      topics: string[]
+      priority: string
+    }[]
+  }[]
+  nextMilestone?: {
+    title: string
+    startDate: string
+    type: string
+  }
+}
+
+interface TodayTask {
+  id: string
+  subject: string
+  topic: string
+  startTime: string
+  duration: number
+  status: 'not_started' | 'in_progress' | 'completed'
+  icon: string
+}
+
+// モックデータ
+const mockSchedule: Schedule = {
+  id: '1',
+  targetDate: '2025-03-15',
+  targetScore: 80,
+  currentScore: 60,
+  status: 'on_track',
+  progress: {
+    totalDays: 180,
+    elapsedDays: 45,
+    remainingDays: 135,
+    totalStudyHours: 120,
+    expectedHours: 115,
+    percentage: 25
+  },
+  monthlyGoals: [
+    {
+      id: '1',
+      month: 7,
+      year: 2025,
+      totalHours: 120,
+      subjectGoals: [
+        {
+          subject: '英語',
+          targetHours: 40,
+          topics: ['長文読解', '文法', 'リスニング'],
+          priority: 'high'
+        },
+        {
+          subject: '数学',
+          targetHours: 35,
+          topics: ['微分積分', '確率統計', 'ベクトル'],
+          priority: 'high'
+        },
+        {
+          subject: '国語',
+          targetHours: 25,
+          topics: ['現代文', '古文', '漢文'],
+          priority: 'medium'
+        },
+        {
+          subject: '理科',
+          targetHours: 20,
+          topics: ['物理', '化学'],
+          priority: 'medium'
+        }
+      ]
+    }
+  ],
+  nextMilestone: {
+    title: '模擬試験',
+    startDate: '2025-08-10',
+    type: 'exam'
+  }
+}
+
+export default function SchedulePage() {
+  const { user, loading: authLoading } = useAuth()
+  const [schedule, setSchedule] = useState<Schedule | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [adjusting, setAdjusting] = useState(false)
+  
+  const [todayTasks] = useState<TodayTask[]>([
+    {
+      id: '1',
+      subject: '英語',
+      topic: '長文読解演習',
+      startTime: '09:00',
+      duration: 90,
+      status: 'not_started',
+      icon: '📘'
+    },
+    {
+      id: '2',
+      subject: '数学',
+      topic: '微分積分',
+      startTime: '15:00',
+      duration: 60,
+      status: 'not_started',
+      icon: '🔵'
+    },
+    {
+      id: '3',
+      subject: '物理',
+      topic: '力学（運動方程式）',
+      startTime: '17:00',
+      duration: 60,
+      status: 'not_started',
+      icon: '⚡'
+    }
+  ])
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchSchedule()
+    } else if (!authLoading && !user) {
+      setLoading(false)
+    }
+  }, [authLoading, user])
+
+  const fetchSchedule = async () => {
+    if (!user) return
+    
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch('/api/schedule/firebase', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSchedule(data)
+      } else {
+        // APIがまだ実装されていない場合はモックデータを使用
+        console.log('APIエラー、モックデータを使用')
+        setSchedule(mockSchedule)
+      }
+    } catch (error) {
+      console.error('Error fetching schedule:', error)
+      // エラー時もモックデータを使用
+      setSchedule(mockSchedule)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAdjustSchedule = async () => {
+    if (!schedule) return
+    
+    setAdjusting(true)
+    // TODO: 実際のAPIに置き換える
+    setTimeout(() => {
+      console.log('スケジュール調整（モック）')
+      setAdjusting(false)
+    }, 2000)
+  }
+
+  const handleStartStudy = (taskId: string) => {
+    // 学習開始の処理
+    console.log('Starting study for task:', taskId)
+    window.location.href = '/study?taskId=' + taskId
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'on_track':
+        return 'text-green-600 bg-green-50'
+      case 'slightly_behind':
+        return 'text-yellow-600 bg-yellow-50'
+      case 'behind':
+        return 'text-red-600 bg-red-50'
+      default:
+        return 'text-gray-600 bg-gray-50'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'on_track':
+        return '順調'
+      case 'slightly_behind':
+        return 'やや遅れ'
+      case 'behind':
+        return '遅れあり'
+      default:
+        return '不明'
+    }
+  }
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">ログインが必要です</h2>
+          <p className="text-gray-600 mb-6">
+            スケジュール機能を使用するにはログインしてください
+          </p>
+          <Link href="/login">
+            <Button size="lg">ログイン</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!schedule) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">スケジュールが設定されていません</h2>
+          <p className="text-gray-600 mb-6">
+            AIが最適な学習計画を作成します
+          </p>
+          <Link href="/schedule/create">
+            <Button size="lg" className="gap-2">
+              <Sparkles className="h-5 w-5" />
+              学習計画を作成
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* ヘッダー */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">学習スケジュール</h1>
+          <p className="text-gray-600">
+            目標まであと{schedule.progress.remainingDays}日
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAdjustSchedule}
+            disabled={adjusting}
+            className="gap-2"
+          >
+            {adjusting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                調整中...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                スケジュール調整
+              </>
+            )}
+          </Button>
+          <Link href="/schedule/edit">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Settings className="h-4 w-4" />
+              設定
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* 進捗サマリー */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">学習進捗</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-2xl font-bold">
+                {schedule.progress.percentage}%
+              </span>
+              <Badge className={getStatusColor(schedule.status)}>
+                {getStatusText(schedule.status)}
+              </Badge>
+            </div>
+            <Progress value={schedule.progress.percentage} className="h-2" />
+            <p className="text-sm text-gray-600 mt-2">
+              {schedule.progress.totalStudyHours.toFixed(1)}時間 / 
+              {schedule.progress.expectedHours.toFixed(1)}時間
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">次のマイルストーン</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {schedule.nextMilestone ? (
+              <div>
+                <p className="font-medium">{schedule.nextMilestone.title}</p>
+                <p className="text-sm text-gray-600">
+                  {format(new Date(schedule.nextMilestone.startDate), 'M月d日', { locale: ja })}
+                </p>
+                <Badge variant="outline" className="mt-2">
+                  {schedule.nextMilestone.type}
+                </Badge>
+              </div>
+            ) : (
+              <p className="text-gray-500">設定されていません</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">目標スコア</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="text-2xl font-bold">{schedule.targetScore}%</span>
+              <span className="text-sm text-gray-600">
+                (現在: {schedule.currentScore}%)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <TrendingUp className="h-4 w-4 text-green-600" />
+              <span className="text-green-600">
+                +{schedule.targetScore - schedule.currentScore}%向上が必要
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* タブ */}
+      <Tabs defaultValue="today" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="today">今日のタスク</TabsTrigger>
+          <TabsTrigger value="calendar">カレンダー</TabsTrigger>
+          <TabsTrigger value="monthly">月間目標</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="today">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                今日のタスク
+              </CardTitle>
+              <CardDescription>
+                {format(new Date(), 'M月d日（E）', { locale: ja })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {todayTasks.map((task, index) => (
+                  <motion.div
+                    key={task.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`p-3 rounded-lg border ${
+                      task.status === 'completed' ? 'bg-green-50 border-green-200' :
+                      task.status === 'in_progress' ? 'bg-blue-50 border-blue-200' :
+                      'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{task.icon}</span>
+                        <div>
+                          <h4 className="font-medium">{task.subject}</h4>
+                          <p className="text-sm text-gray-600">{task.topic}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{task.startTime}</p>
+                        <p className="text-xs text-gray-500">{task.duration}分</p>
+                      </div>
+                    </div>
+                    {task.status === 'not_started' && (
+                      <Button
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => handleStartStudy(task.id)}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        学習を開始
+                      </Button>
+                    )}
+                    {task.status === 'in_progress' && (
+                      <Badge className="mt-2" variant="default">
+                        学習中
+                      </Badge>
+                    )}
+                    {task.status === 'completed' && (
+                      <Badge className="mt-2" variant="secondary">
+                        完了
+                      </Badge>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar">
+        </TabsContent>
+
+        <TabsContent value="monthly">
+          <Card>
+            <CardHeader>
+              <CardTitle>月間学習目標</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {schedule.monthlyGoals
+                  .filter(goal => {
+                    const now = new Date()
+                    return goal.year === now.getFullYear() && 
+                           goal.month === now.getMonth() + 1
+                  })
+                  .map(goal => (
+                    <div key={goal.id} className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-medium">
+                          {goal.year}年{goal.month}月
+                        </h3>
+                        <Badge>
+                          目標: {goal.totalHours}時間
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {goal.subjectGoals.map(subject => (
+                          <div key={subject.subject} className="flex items-center justify-between">
+                            <span className="text-sm">{subject.subject}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">
+                                {subject.targetHours}時間
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {subject.priority}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

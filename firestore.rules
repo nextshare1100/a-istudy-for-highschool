@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザー認証の確認
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ユーザー自身のデータか確認
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // ユーザープロファイル
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
+    // 問題コレクション
+    match /problems/{problemId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.generatedFor || 
+         request.auth.uid == resource.data.creatorId);
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.generatedFor;
+    }
+    
+    // 問題生成履歴
+    match /problem_generation_history/{historyId} {
+      allow read, write: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+  }
+}

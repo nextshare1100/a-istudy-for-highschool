@@ -1,0 +1,132 @@
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// 保護されたルート
+const protectedRoutes = [
+  '/home',
+  '/study',
+  '/progress',
+  '/schedule',
+  '/subscription',
+  '/settings',
+  '/api/problems',
+  '/api/answers',
+  '/api/progress',
+  '/api/schedule',
+  '/api/stripe',
+]
+
+// 公開ルート
+const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/reset-password',
+  '/api/stripe/webhook', // Stripe Webhookは認証不要
+]
+
+// 認証が必要なAPIルート
+const protectedApiRoutes = [
+  '/api/problems',
+  '/api/answers',
+  '/api/progress',
+  '/api/schedule',
+  '/api/stripe/create-checkout-session',
+  '/api/stripe/create-portal-session',
+  '/api/subscription',
+]
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // 静的ファイルや_nextパスはスキップ
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname.includes('.') // ファイル拡張子を持つリクエスト
+  ) {
+    return NextResponse.next()
+  }
+
+  // セッションクッキーからトークンを取得
+  const token = request.cookies.get('session')?.value
+
+  // 保護されたルートへのアクセスチェック
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+  const isProtectedApiRoute = protectedApiRoutes.some(route => pathname.startsWith(route))
+  const isPublicRoute = publicRoutes.includes(pathname)
+
+  // APIルートの処理
+  if (isProtectedApiRoute && !token) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  // 保護されたルートで未認証の場合
+  if (isProtectedRoute && !token) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(url)
+  }
+
+  // 認証済みユーザーが認証ページにアクセスした場合
+  if (token && (pathname === '/login' || pathname === '/register')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/home'
+    return NextResponse.redirect(url)
+  }
+
+  // トークンが存在する場合、検証を行う（サーバーサイドでの詳細な検証）
+  if (token && (isProtectedRoute || isProtectedApiRoute)) {
+    try {
+      // Firebase Admin SDKを使用したトークン検証
+      const response = await fetch(`${request.nextUrl.origin}/api/auth/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      })
+
+      if (!response.ok) {
+        // トークンが無効な場合
+        const response = NextResponse.redirect(new URL('/login', request.url))
+        response.cookies.delete('session')
+        return response
+      }
+
+      // 検証成功時、ユーザー情報をヘッダーに追加
+      const { uid, email } = await response.json()
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set('x-user-id', uid)
+      requestHeaders.set('x-user-email', email)
+
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
+    } catch (error) {
+      console.error('Token verification error:', error)
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/auth (authentication endpoints)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+  ],
+}
