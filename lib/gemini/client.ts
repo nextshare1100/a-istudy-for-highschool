@@ -238,6 +238,12 @@ export function getGeminiClient(): GeminiClient {
   return clientInstance;
 }
 
+// generateScheduleWithAI エクスポート（互換性のため）
+export const generateScheduleWithAI = async (request: GeminiScheduleRequest) => {
+  const client = getGeminiClient();
+  return client.createSchedule(request);
+};
+
 // geminiService として export（study-store.ts で使用されている）
 export const geminiService = {
   generateProblem: async (params: {
@@ -352,3 +358,9 @@ function generateCanvasData(type: string, description?: string): any {
       return {};
   }
 }
+
+// createSchedule エクスポート（直接）
+export const createSchedule = async (request: GeminiScheduleRequest) => {
+  const client = getGeminiClient();
+  return client.createSchedule(request);
+};

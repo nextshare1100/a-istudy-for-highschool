@@ -109,8 +109,60 @@ export function getServerTimestamp() {
   return admin.firestore.FieldValue.serverTimestamp()
 }
 
-// 法人契約システム用のエクスポート（互換性のため）
-// getAdminAuth()とgetAdminFirestore()を直接使用してください
+// 互換性のためのエクスポート（既存のコードとの互換性を保つため）
+export const auth = {
+  getUser: async (uid: string) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.getUser(uid);
+  },
+  verifyIdToken: async (token: string) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.verifyIdToken(token);
+  },
+  setCustomUserClaims: async (uid: string, claims: Record<string, any>) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.setCustomUserClaims(uid, claims);
+  },
+  createUser: async (properties: any) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.createUser(properties);
+  },
+  updateUser: async (uid: string, properties: any) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.updateUser(uid, properties);
+  },
+  deleteUser: async (uid: string) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.deleteUser(uid);
+  },
+  listUsers: async (maxResults?: number, pageToken?: string) => {
+    const adminAuth = getAdminAuth();
+    return adminAuth.listUsers(maxResults, pageToken);
+  }
+};
+
+export const db = {
+  collection: (path: string) => {
+    const adminDb = getAdminFirestore();
+    return adminDb.collection(path);
+  },
+  doc: (path: string) => {
+    const adminDb = getAdminFirestore();
+    return adminDb.doc(path);
+  },
+  collectionGroup: (collectionId: string) => {
+    const adminDb = getAdminFirestore();
+    return adminDb.collectionGroup(collectionId);
+  },
+  batch: () => {
+    const adminDb = getAdminFirestore();
+    return adminDb.batch();
+  },
+  runTransaction: async (updateFunction: any) => {
+    const adminDb = getAdminFirestore();
+    return adminDb.runTransaction(updateFunction);
+  }
+};
 
 // FieldValueをエクスポート（法人契約システムで使用）
 export { FieldValue }
