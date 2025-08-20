@@ -1,3 +1,4 @@
+// A-IStudy Home Page - Updated $(date)
 'use client'
 
 import { useState, useEffect } from 'react'
