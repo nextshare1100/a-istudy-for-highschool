@@ -209,7 +209,7 @@ export function LoginForm() {
           description: 'ダッシュボードへ移動します',
         })
         // 強制的にページを再読み込みして認証状態を確実に反映
-        window.location.href = intendedRedirect
+        window.location.href = `https://a-istudy-highschool.vercel.app${intendedRedirect}`
       } else {
         // サブスクリプションがない場合は料金プランページへ
         console.log('サブスクリプションなし。料金プランページへ遷移')
@@ -219,7 +219,7 @@ export function LoginForm() {
           variant: 'default',
         })
         // 元の遷移先を保持してプランページへ
-        window.location.href = `/subscription/register?redirect=${encodeURIComponent(intendedRedirect)}`
+        window.location.href = `https://a-istudy-highschool.vercel.app/subscription/register?redirect=${encodeURIComponent(intendedRedirect)}`
       }
       
     } catch (err: any) {

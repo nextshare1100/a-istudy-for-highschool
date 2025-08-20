@@ -353,7 +353,7 @@ export function RegisterForm() {
       })
       
       setTimeout(() => {
-        window.location.href = '/subscription/register?welcome=true';
+        window.location.href = 'https://a-istudy-highschool.vercel.app/subscription/register?welcome=true';
       }, 1500);
       
     } catch (err: any) {
