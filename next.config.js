@@ -31,8 +31,6 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  // 動的ページのエラーを回避
-  generateStaticParams: false,
 };
 
 module.exports = withPWA(nextConfig);
