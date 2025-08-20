@@ -53,6 +53,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "katex": "^0.16.22",
+    "lru-cache": "^10.4.3",
     "lucide-react": "^0.525.0",
     "nanoid": "^5.1.5",
     "next": "15.4.3",
