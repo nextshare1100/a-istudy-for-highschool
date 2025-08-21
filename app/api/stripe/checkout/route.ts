@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
  console.log('=== Stripe Checkout API Called ===');
  
  try {
+   // Stripeの初期化を関数内で行う（エラー回避のため）
+   const stripeKey = process.env.STRIPE_SECRET_KEY;
+   if (!stripeKey) {
+     console.error('STRIPE_SECRET_KEY is missing');
+     return NextResponse.json(
+       { error: 'Stripe設定エラー' },
+       { status: 500 }
+     );
+   }
+   
+   const Stripe = require('stripe');
+   const stripe = new Stripe(stripeKey, {
+     apiVersion: '2023-10-16',
+   });
+   
    const body = await request.json();
    console.log('Request body:', body);
    
@@ -20,9 +34,6 @@ export async function POST(request: NextRequest) {
      priceIdMonthly: process.env.STRIPE_PRICE_MONTHLY_ID,
      priceIdSetupFee: process.env.STRIPE_PRICE_SETUP_FEE_ID,
      appUrl: process.env.NEXT_PUBLIC_APP_URL,
-     // 値の最初の数文字だけ表示（セキュリティのため）
-     stripeKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7),
-     privateKeyPrefix: process.env.FIREBASE_PRIVATE_KEY?.substring(0, 20),
    });
 
    if (!userId) {
