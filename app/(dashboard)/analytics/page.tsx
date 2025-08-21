@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { 
   Calendar, 
   TrendingUp, 
@@ -52,13 +51,13 @@ import {
   Legend
 } from 'recharts'
 
-// モバイル対応スタイルオブジェクト（縮小版）
+// レスポンシブ対応スタイルオブジェクト
 const styles = {
   pageContainer: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%)',
     position: 'relative' as const,
-    paddingBottom: '60px', // ナビゲーション分の余白
+    paddingBottom: '60px',
   },
   header: {
     background: 'white',
@@ -69,25 +68,25 @@ const styles = {
     zIndex: 40,
   },
   headerContent: {
-    maxWidth: '370px',
+    maxWidth: '1200px',
     margin: '0 auto',
-    padding: '12px',
+    padding: '16px 24px',
   },
   headerTitle: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    marginBottom: '8px',
+    gap: '12px',
+    marginBottom: '12px',
   },
   headerIcon: {
-    padding: '6px',
+    padding: '10px',
     background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-    borderRadius: '8px',
+    borderRadius: '12px',
     color: 'white',
     boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)',
   },
   title: {
-    fontSize: '16px',
+    fontSize: '24px',
     fontWeight: 'bold',
     background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
     WebkitBackgroundClip: 'text',
@@ -96,19 +95,19 @@ const styles = {
   },
   subtitle: {
     color: '#6b7280',
-    marginTop: '2px',
-    fontSize: '11px',
+    marginTop: '4px',
+    fontSize: '14px',
   },
   primaryButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: '6px 12px',
+    gap: '6px',
+    padding: '10px 20px',
     background: 'linear-gradient(135deg, #9333ea 0%, #6366f1 100%)',
     color: 'white',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontWeight: '600',
-    fontSize: '11px',
+    fontSize: '14px',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
@@ -117,13 +116,13 @@ const styles = {
   secondaryButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: '6px 12px',
+    gap: '6px',
+    padding: '10px 20px',
     background: 'white',
     color: '#374151',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontWeight: '600',
-    fontSize: '11px',
+    fontSize: '14px',
     border: '1px solid #e5e7eb',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
@@ -132,11 +131,11 @@ const styles = {
     base: {
       display: 'flex',
       alignItems: 'center',
-      gap: '4px',
-      padding: '6px 10px',
-      borderRadius: '8px',
+      gap: '6px',
+      padding: '10px 24px',
+      borderRadius: '10px',
       fontWeight: '600',
-      fontSize: '10px',
+      fontSize: '14px',
       transition: 'all 0.3s ease',
       cursor: 'pointer',
       border: '1px solid transparent',
@@ -157,10 +156,10 @@ const styles = {
   },
   dateRangeButton: {
     base: {
-      padding: '6px 10px',
-      borderRadius: '8px',
+      padding: '8px 16px',
+      borderRadius: '10px',
       fontWeight: '600',
-      fontSize: '10px',
+      fontSize: '13px',
       transition: 'all 0.3s ease',
       cursor: 'pointer',
       border: '1px solid transparent',
@@ -177,34 +176,34 @@ const styles = {
     }
   },
   mainContent: {
-    maxWidth: '370px',
+    maxWidth: '1200px',
     margin: '0 auto',
-    padding: '12px',
+    padding: '24px',
   },
   mainCard: {
     background: 'linear-gradient(135deg, #ffffff 95%, #f9fafb 100%)',
-    borderRadius: '12px',
+    borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
     border: '1px solid rgba(99, 102, 241, 0.1)',
-    padding: '12px',
+    padding: '24px',
     position: 'relative' as const,
     overflow: 'hidden',
   },
   metricCard: {
     base: {
       background: 'white',
-      borderRadius: '12px',
+      borderRadius: '16px',
       boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
       border: '1px solid #e5e7eb',
-      padding: '12px',
+      padding: '20px',
       transition: 'all 0.3s ease',
       cursor: 'pointer',
       position: 'relative' as const,
       overflow: 'hidden',
     },
     hover: {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 6px 16px rgba(0, 0, 0, 0.1)',
       borderColor: '#c7d2fe',
     },
     gradients: {
@@ -219,8 +218,8 @@ const styles = {
   },
   weaknessCard: {
     base: {
-      padding: '8px',
-      borderRadius: '8px',
+      padding: '16px',
+      borderRadius: '12px',
       background: '#f9fafb',
       border: '1px solid #e5e7eb',
       cursor: 'pointer',
@@ -228,7 +227,7 @@ const styles = {
     },
     hover: {
       background: '#f3f4f6',
-      transform: 'translateX(1px)',
+      transform: 'translateX(2px)',
     }
   },
   emptyState: {
@@ -236,41 +235,41 @@ const styles = {
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '24px 12px',
+    padding: '48px 24px',
     textAlign: 'center' as const,
   },
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '2px',
-    padding: '2px 6px',
+    gap: '4px',
+    padding: '4px 12px',
     borderRadius: '9999px',
-    fontSize: '9px',
+    fontSize: '12px',
     fontWeight: '500',
   },
   levelCard: {
     background: 'white',
-    borderRadius: '10px',
-    padding: '10px',
+    borderRadius: '12px',
+    padding: '16px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
-    marginBottom: '12px',
+    marginBottom: '16px',
   },
   chartCard: {
     background: 'white',
-    borderRadius: '12px',
-    padding: '12px',
+    borderRadius: '16px',
+    padding: '24px',
     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
     border: '1px solid #e5e7eb',
   },
   infoBox: {
-    padding: '8px',
-    borderRadius: '8px',
+    padding: '12px',
+    borderRadius: '10px',
     background: '#dbeafe',
-    marginBottom: '12px',
+    marginBottom: '16px',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px'
+    gap: '8px'
   }
 }
 
@@ -328,7 +327,14 @@ const generateDummyData = () => {
 }
 
 export default function ImprovedAnalyticsPage() {
-  const router = useRouter()
+  // Simple navigation function for demo purposes
+  const navigate = (path: string) => {
+    console.log(`Navigating to: ${path}`)
+    // In a real app, you would use React Router or similar
+    // For now, we'll just log the navigation
+    window.location.hash = path
+  }
+  
   const [dateRange, setDateRange] = useState('week')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -365,7 +371,7 @@ export default function ImprovedAnalyticsPage() {
         background: config.bg,
         color: config.color,
       }}>
-        <Info size={10} />
+        <Info size={14} />
         {config.label}
       </span>
     )
@@ -373,16 +379,16 @@ export default function ImprovedAnalyticsPage() {
 
   const renderEmptyState = (title: string, description: string, actionLabel?: string, actionPath?: string) => (
     <div style={styles.emptyState}>
-      <AlertCircle style={{ color: '#9ca3af', marginBottom: '8px' }} size={32} />
-      <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+      <AlertCircle style={{ color: '#9ca3af', marginBottom: '16px' }} size={48} />
+      <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
         {title}
       </h3>
-      <p style={{ color: '#6b7280', marginBottom: '12px', maxWidth: '280px', fontSize: '11px' }}>
+      <p style={{ color: '#6b7280', marginBottom: '24px', maxWidth: '500px', fontSize: '14px' }}>
         {description}
       </p>
       {actionLabel && actionPath && (
         <button
-          onClick={() => router.push(actionPath)}
+          onClick={() => navigate(actionPath)}
           style={styles.primaryButton}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.05)';
@@ -394,7 +400,7 @@ export default function ImprovedAnalyticsPage() {
           }}
         >
           {actionLabel}
-          <ChevronRight size={12} />
+          <ChevronRight size={16} />
         </button>
       )}
     </div>
@@ -431,23 +437,23 @@ export default function ImprovedAnalyticsPage() {
           top: 0,
           left: 0,
           right: 0,
-          height: '2px',
+          height: '3px',
           background: hasData ? 'rgba(255, 255, 255, 0.3)' : '#e5e7eb',
-          borderRadius: '12px 12px 0 0',
+          borderRadius: '16px 16px 0 0',
         }} />
         
         <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between' }}>
           <div>
             <p style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '500',
               color: hasData ? 'rgba(255, 255, 255, 0.9)' : '#6b7280',
-              marginBottom: '2px'
+              marginBottom: '4px'
             }}>
               {title}
             </p>
             <p style={{
-              fontSize: '18px',
+              fontSize: '28px',
               fontWeight: 'bold',
               color: hasData ? 'white' : '#9ca3af'
             }}>
@@ -455,18 +461,18 @@ export default function ImprovedAnalyticsPage() {
             </p>
             {subtitle && (
               <p style={{
-                fontSize: '9px',
+                fontSize: '12px',
                 color: hasData ? 'rgba(255, 255, 255, 0.8)' : '#6b7280',
-                marginTop: '2px'
+                marginTop: '4px'
               }}>
                 {subtitle}
               </p>
             )}
             {progress !== null && hasData && (
               <div style={{
-                marginTop: '6px',
-                height: '4px',
-                borderRadius: '2px',
+                marginTop: '12px',
+                height: '6px',
+                borderRadius: '3px',
                 background: 'rgba(255, 255, 255, 0.3)',
                 overflow: 'hidden'
               }}>
@@ -480,11 +486,11 @@ export default function ImprovedAnalyticsPage() {
             )}
           </div>
           <div style={{
-            padding: '6px',
-            borderRadius: '6px',
+            padding: '12px',
+            borderRadius: '10px',
             background: hasData ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb'
           }}>
-            <Icon size={16} style={{ color: hasData ? 'white' : '#9ca3af' }} />
+            <Icon size={24} style={{ color: hasData ? 'white' : '#9ca3af' }} />
           </div>
         </div>
       </div>
@@ -495,7 +501,7 @@ export default function ImprovedAnalyticsPage() {
     return (
       <div style={styles.pageContainer}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#6366f1' }} />
+          <Loader2 size={40} style={{ animation: 'spin 1s linear infinite', color: '#6366f1' }} />
         </div>
       </div>
     )
@@ -528,10 +534,10 @@ export default function ImprovedAnalyticsPage() {
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={styles.headerContent}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={styles.headerTitle}>
               <div style={styles.headerIcon}>
-                <BarChart3 size={18} />
+                <BarChart3 size={24} />
               </div>
               <div>
                 <h1 style={styles.title}>
@@ -542,7 +548,7 @@ export default function ImprovedAnalyticsPage() {
             
             <button
               style={styles.primaryButton}
-              onClick={() => router.push('/analytics/mock-exam')}
+              onClick={() => navigate('/analytics/mock-exam')}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.05)';
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
@@ -552,95 +558,97 @@ export default function ImprovedAnalyticsPage() {
                 e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
               }}
             >
-              <Plus size={12} />
+              <Plus size={16} />
               模試追加
             </button>
           </div>
 
-          {/* ユーザーレベル */}
-          <div style={styles.levelCard}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{
-                  padding: '4px',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  borderRadius: '6px',
-                  color: 'white',
-                }}>
-                  <Activity size={14} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '16px', alignItems: 'center' }}>
+            {/* ユーザーレベル */}
+            <div style={{ ...styles.levelCard, marginBottom: 0, minWidth: '200px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    padding: '8px',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    borderRadius: '8px',
+                    color: 'white',
+                  }}>
+                    <Activity size={20} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '12px', color: '#6b7280' }}>学習レベル</p>
+                    <p style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                      {userLevel === 'advanced' ? '上級者' :
+                       userLevel === 'intermediate' ? '中級者' : '初級者'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p style={{ fontSize: '9px', color: '#6b7280' }}>学習レベル</p>
-                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#1f2937' }}>
-                    {userLevel === 'advanced' ? '上級者' :
-                     userLevel === 'intermediate' ? '中級者' : '初級者'}
-                  </p>
-                </div>
+                <Target size={20} style={{ color: '#6b7280' }} />
               </div>
-              <Target size={14} style={{ color: '#6b7280' }} />
             </div>
-          </div>
 
-          {/* 期間選択 */}
-          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginBottom: '8px' }}>
-            {dateRanges.map(range => (
-              <button
-                key={range.value}
-                onClick={() => setDateRange(range.value)}
-                style={{
-                  ...styles.dateRangeButton.base,
-                  ...(dateRange === range.value ? styles.dateRangeButton.active : styles.dateRangeButton.inactive),
-                }}
-                onMouseEnter={(e) => {
-                  if (dateRange !== range.value) {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (dateRange !== range.value) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }
-                }}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-
-          {/* タブ */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-            {tabs.map(tab => {
-              const Icon = tab.icon
-              const isActive = activeTab === tab.id
-              
-              return (
+            {/* 期間選択 */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              {dateRanges.map(range => (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  key={range.value}
+                  onClick={() => setDateRange(range.value)}
                   style={{
-                    ...styles.tabButton.base,
-                    ...(isActive ? styles.tabButton.active : styles.tabButton.inactive),
+                    ...styles.dateRangeButton.base,
+                    ...(dateRange === range.value ? styles.dateRangeButton.active : styles.dateRangeButton.inactive),
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) {
+                    if (dateRange !== range.value) {
                       e.currentTarget.style.transform = 'translateY(-1px)';
                       e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) {
+                    if (dateRange !== range.value) {
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = 'none';
                     }
                   }}
                 >
-                  <Icon size={12} />
-                  <span>{tab.label}</span>
+                  {range.label}
                 </button>
-              )
-            })}
+              ))}
+            </div>
+
+            {/* タブ */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              {tabs.map(tab => {
+                const Icon = tab.icon
+                const isActive = activeTab === tab.id
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      ...styles.tabButton.base,
+                      ...(isActive ? styles.tabButton.active : styles.tabButton.inactive),
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
+                    }}
+                  >
+                    <Icon size={16} />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -653,9 +661,9 @@ export default function ImprovedAnalyticsPage() {
             {/* メトリックカード */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '8px',
-              marginBottom: '16px'
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
             }}>
               {renderMetricCard(
                 '本日の学習時間',
@@ -700,25 +708,25 @@ export default function ImprovedAnalyticsPage() {
             </div>
 
             {/* チャートセクション */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '16px' }}>
               {/* 週間学習時間推移 */}
               <div style={styles.chartCard}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <BarChart3 size={14} style={{ color: '#6366f1' }} />
-                    <h3 style={{ fontSize: '12px', fontWeight: '600', color: '#1f2937' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart3 size={20} style={{ color: '#6366f1' }} />
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
                       週間学習時間
                     </h3>
                   </div>
                   {data?.studyTimeStats?.hasData && (
-                    <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                    <span style={{ fontSize: '14px', color: '#6b7280' }}>
                       計: {data.studyTimeStats.weeklyTotal.toFixed(1)}h
                     </span>
                   )}
                 </div>
                 
                 {data?.studyTimeStats?.hasData ? (
-                  <ResponsiveContainer width="100%" height={140}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={data.studyTimeStats.weeklyTrend}>
                       <defs>
                         <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
@@ -727,14 +735,14 @@ export default function ImprovedAnalyticsPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="date" stroke="#6b7280" fontSize={9} />
-                      <YAxis stroke="#6b7280" fontSize={9} />
+                      <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
+                      <YAxis stroke="#6b7280" fontSize={12} />
                       <Tooltip 
                         contentStyle={{
                           backgroundColor: 'white',
                           border: '1px solid #e5e7eb',
-                          borderRadius: '6px',
-                          fontSize: '10px'
+                          borderRadius: '8px',
+                          fontSize: '12px'
                         }}
                       />
                       <Area 
@@ -758,16 +766,16 @@ export default function ImprovedAnalyticsPage() {
 
               {/* 弱点トップ5 */}
               <div style={styles.chartCard}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertCircle size={14} style={{ color: '#ef4444' }} />
-                    <h3 style={{ fontSize: '12px', fontWeight: '600', color: '#1f2937' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={20} style={{ color: '#ef4444' }} />
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
                       弱点トップ5
                     </h3>
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {data?.weaknessData?.length > 0 ? (
                     data.weaknessData.slice(0, 5).map((weakness: any, index: number) => (
                       <div 
@@ -780,17 +788,17 @@ export default function ImprovedAnalyticsPage() {
                           Object.assign(e.currentTarget.style, styles.weaknessCard.base);
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '10px', fontWeight: '600', color: '#1f2937' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
                               {weakness.subject}
                             </span>
-                            <span style={{ fontSize: '9px', color: '#6b7280' }}>
+                            <span style={{ fontSize: '12px', color: '#6b7280' }}>
                               {weakness.unit}
                             </span>
                           </div>
                           <span style={{
-                            fontSize: '10px',
+                            fontSize: '14px',
                             fontWeight: 'bold',
                             color: weakness.accuracy < 50 ? '#ef4444' :
                                    weakness.accuracy < 70 ? '#f59e0b' : '#10b981'
@@ -799,8 +807,8 @@ export default function ImprovedAnalyticsPage() {
                           </span>
                         </div>
                         <div style={{
-                          height: '4px',
-                          borderRadius: '2px',
+                          height: '6px',
+                          borderRadius: '3px',
                           background: '#e5e7eb',
                           overflow: 'hidden'
                         }}>
@@ -834,43 +842,43 @@ export default function ImprovedAnalyticsPage() {
         {activeTab === 'weakness' && (
           <div style={{ animation: 'fadeIn 0.3s ease' }}>
             <div style={styles.mainCard}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
                 弱点分析結果
               </h3>
               
               {data?.weaknessData?.length > 0 ? (
                 <>
-                  <div style={{ display: 'flex', gap: '8px', color: '#6b7280', fontSize: '10px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', gap: '16px', color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
                     <span>検出: {data.weaknessData.length}件</span>
                     <span>•</span>
                     <span>期間: 30日間</span>
                   </div>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
                     {data.weaknessData.map((weakness: any, index: number) => (
                       <div 
                         key={index}
                         style={{
-                          borderRadius: '10px',
+                          borderRadius: '12px',
                           border: '1px solid #e5e7eb',
-                          padding: '10px',
+                          padding: '20px',
                           transition: 'all 0.3s ease',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.borderColor = '#c7d2fe';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.borderColor = '#e5e7eb';
                           e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '12px' }}>
                           <div>
-                            <h4 style={{ fontSize: '12px', fontWeight: '600', color: '#1f2937' }}>
+                            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
                               {weakness.subject} - {weakness.unit}
                             </h4>
-                            <p style={{ marginTop: '2px', fontSize: '9px', color: '#6b7280' }}>
+                            <p style={{ marginTop: '4px', fontSize: '13px', color: '#6b7280' }}>
                               正答率: {Math.round(weakness.accuracy)}% | 
                               問題数: {weakness.totalQuestions}問
                             </p>
@@ -881,17 +889,17 @@ export default function ImprovedAnalyticsPage() {
                         <button
                           style={{
                             width: '100%',
-                            padding: '6px 10px',
+                            padding: '10px 16px',
                             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                             color: 'white',
-                            borderRadius: '6px',
-                            fontSize: '10px',
+                            borderRadius: '8px',
+                            fontSize: '14px',
                             fontWeight: '500',
                             border: 'none',
                             cursor: 'pointer',
                             transition: 'all 0.2s ease',
                           }}
-                          onClick={() => router.push(`/problems?subject=${weakness.subject}&unit=${weakness.unit}`)}
+                          onClick={() => navigate(`/problems?subject=${weakness.subject}&unit=${weakness.unit}`)}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'scale(1.02)';
                           }}

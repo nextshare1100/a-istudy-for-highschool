@@ -1605,7 +1605,7 @@ export function StudyTimer({ subjects = [] }: StudyTimerProps) {
 
           {/* 操作ボタン */}
           <div className="button-group">
-            {!isActive && seconds === 0 ? (
+            {!isActive ? (
               <>
                 <button 
                   className="btn btn-primary"
@@ -1689,64 +1689,64 @@ export function StudyTimer({ subjects = [] }: StudyTimerProps) {
               )}
               
               {studyContent.goals.length > 0 && (
-                <div className="content-section">
-                  <div className="content-label">目標</div>
-                  <ul className="goal-list">
-                    {studyContent.goals.slice(0, 3).map((goal, i) => (
-                      <li key={i} className="goal-item">{goal}</li>
-                    ))}
-                    {studyContent.goals.length > 3 && (
-                      <li className="goal-item" style={{ fontStyle: 'italic', color: '#636e72' }}>
-                        他{studyContent.goals.length - 3}件
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-              
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowContentForm(true)}
-                style={{ width: '100%', marginTop: '16px' }}
-              >
-                <Edit size={18} />
-                学習内容を編集
-              </button>
-            </div>
-          )}
+               <div className="content-section">
+                 <div className="content-label">目標</div>
+                 <ul className="goal-list">
+                   {studyContent.goals.slice(0, 3).map((goal, i) => (
+                     <li key={i} className="goal-item">{goal}</li>
+                   ))}
+                   {studyContent.goals.length > 3 && (
+                     <li className="goal-item" style={{ fontStyle: 'italic', color: '#636e72' }}>
+                       他{studyContent.goals.length - 3}件
+                     </li>
+                   )}
+                 </ul>
+               </div>
+             )}
+             
+             <button
+               className="btn btn-outline"
+               onClick={() => setShowContentForm(true)}
+               style={{ width: '100%', marginTop: '16px' }}
+             >
+               <Edit size={18} />
+               学習内容を編集
+             </button>
+           </div>
+         )}
 
-          {/* 学習内容未設定時の追加ボタン */}
-          {isActive && studyContent?.mainTheme === '学習内容未設定' && (
-            <button
-              className="add-content-btn"
-              onClick={() => setShowContentForm(true)}
-            >
-              <Plus size={20} />
-              学習内容を追加
-            </button>
-          )}
-        </div>
-      </div>
+         {/* 学習内容未設定時の追加ボタン */}
+         {isActive && studyContent?.mainTheme === '学習内容未設定' && (
+           <button
+             className="add-content-btn"
+             onClick={() => setShowContentForm(true)}
+           >
+             <Plus size={20} />
+             学習内容を追加
+           </button>
+         )}
+       </div>
+     </div>
 
-      {/* 学習内容フォーム */}
-      {!showFeedbackForm && (
-        <StudyContentForm
-          open={showContentForm}
-          onClose={() => setShowContentForm(false)}
-          onSubmit={isActive ? handleContentUpdate : handleContentSubmit}
-          sessionId={sessionId}
-          isUpdate={isActive}
-        />
-      )}
+     {/* 学習内容フォーム */}
+     {!showFeedbackForm && (
+       <StudyContentForm
+         open={showContentForm}
+         onClose={() => setShowContentForm(false)}
+         onSubmit={isActive ? handleContentUpdate : handleContentSubmit}
+         sessionId={sessionId}
+         isUpdate={isActive}
+       />
+     )}
 
-      {/* フィードバックフォーム */}
-      <StudyFeedbackForm
-        open={showFeedbackForm}
-        onClose={() => setShowFeedbackForm(false)}
-        onSubmit={handleFeedbackSubmit}
-        sessionId={sessionId}
-        elapsedTime={timerMode === 'countup' ? seconds : (targetTime - seconds)}
-      />
-    </>
-  )
+     {/* フィードバックフォーム */}
+     <StudyFeedbackForm
+       open={showFeedbackForm}
+       onClose={() => setShowFeedbackForm(false)}
+       onSubmit={handleFeedbackSubmit}
+       sessionId={sessionId}
+       elapsedTime={timerMode === 'countup' ? seconds : (targetTime - seconds)}
+     />
+   </>
+ )
 }

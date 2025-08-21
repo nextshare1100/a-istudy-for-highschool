@@ -19,8 +19,29 @@ import {
  Shield,
  Zap,
  ArrowRight,
- X
+ X,
+ AlertCircle,
+ Smartphone
 } from 'lucide-react';
+
+// プラットフォーム検出ユーティリティ
+const getPlatform = () => {
+  if (typeof window === 'undefined') return 'web';
+  
+  // React Native WebView検出
+  if ((window as any).ReactNativeWebView) {
+    return 'app';
+  }
+  
+  // Capacitor/Cordova検出
+  if ((window as any).Capacitor || (window as any).cordova) {
+    return 'app';
+  }
+  
+  return 'web';
+};
+
+const isAppEnvironment = () => getPlatform() === 'app';
 
 // Stripe設定をファイル内に含める
 let stripePromise: Promise<any>;
@@ -48,6 +69,12 @@ export default function SubscriptionPage() {
  const [campaignCode, setCampaignCode] = useState('');
  const [showCampaignNotice, setShowCampaignNotice] = useState(false);
  const [isMobile, setIsMobile] = useState(false);
+ const [platform, setPlatform] = useState<'web' | 'app'>('web');
+ 
+ // プラットフォーム検出
+ useEffect(() => {
+   setPlatform(getPlatform() as 'web' | 'app');
+ }, []);
  
  // 決済成功時の処理
  useEffect(() => {
@@ -123,8 +150,45 @@ export default function SubscriptionPage() {
    }
  }, []);
  
- // 本番環境の決済処理
+ // 統合決済処理
  const handleCheckout = async (withCampaignCode: boolean = false) => {
+   // アプリ環境の場合はアプリ内購入を開始
+   if (isAppEnvironment()) {
+     if (!userProfile?.uid) {
+       alert('ログインが必要です');
+       return;
+     }
+     
+     setIsLoading(true);
+     
+     // React Native WebViewにメッセージを送信
+     if ((window as any).ReactNativeWebView) {
+       (window as any).ReactNativeWebView.postMessage(
+         JSON.stringify({
+           type: 'openInAppPurchase',
+           action: 'subscribe',
+           productType: 'monthly_with_setup_fee',
+           userId: userProfile.uid,
+           userEmail: userProfile.email
+         })
+       );
+       
+       // ローディング状態を3秒後に解除（アプリ側からの応答がない場合のフォールバック）
+       setTimeout(() => {
+         setIsLoading(false);
+       }, 3000);
+     } else {
+       // フォールバック
+       setIsLoading(false);
+       alert(
+         'アプリ内購入を開始できませんでした。\n\n' +
+         'アプリを再起動してお試しください。'
+       );
+     }
+     return; // ここで処理を終了（Stripeに進まない）
+   }
+   
+   // Web版の場合は既存のStripe決済処理
    if (withCampaignCode && campaignCode.trim() && !showCampaignNotice) {
      setShowCampaignNotice(true);
      return;
@@ -179,6 +243,19 @@ export default function SubscriptionPage() {
      
      if (error) {
        console.error('Stripe redirect error:', error);
+       
+       // エラーハンドリングの改善
+       if (error.message?.includes('blocked') || error.name === 'NetworkError') {
+         alert(
+           '決済ページへのアクセスがブロックされている可能性があります。\n\n' +
+           '以下をお試しください：\n' +
+           '• 広告ブロッカーを一時的に無効化\n' +
+           '• ブラウザの拡張機能を無効化\n' +
+           '• シークレットモード/プライベートブラウジングで再試行'
+         );
+       } else {
+         alert('決済処理中にエラーが発生しました。時間をおいて再度お試しください。');
+       }
        throw error;
      }
    } catch (error: any) {
@@ -192,6 +269,32 @@ export default function SubscriptionPage() {
      setIsLoading(false);
    }
  };
+ 
+ // アプリからの決済完了メッセージを受信
+ useEffect(() => {
+   if (!isAppEnvironment()) return;
+   
+   const handleMessage = (event: MessageEvent) => {
+     try {
+       const data = JSON.parse(event.data);
+       if (data.type === 'purchaseSuccess') {
+         setIsLoading(false);
+         alert('サブスクリプション登録が完了しました！');
+         setTimeout(() => {
+           router.push('/home');
+         }, 1000);
+       } else if (data.type === 'purchaseError') {
+         setIsLoading(false);
+         alert(data.message || '購入処理中にエラーが発生しました');
+       }
+     } catch (error) {
+       console.error('Message handling error:', error);
+     }
+   };
+   
+   window.addEventListener('message', handleMessage);
+   return () => window.removeEventListener('message', handleMessage);
+ }, [router]);
 
  // スタイル定義
  const styles = {
@@ -266,6 +369,16 @@ export default function SubscriptionPage() {
      cursor: 'pointer',
      transition: 'all 0.2s',
      whiteSpace: 'nowrap' as const,
+   },
+   appNotice: {
+     backgroundColor: '#eff6ff',
+     borderRadius: isMobile ? '10px' : '12px',
+     padding: isMobile ? '12px' : '16px',
+     marginBottom: isMobile ? '16px' : '24px',
+     display: 'flex',
+     alignItems: 'flex-start',
+     gap: isMobile ? '8px' : '12px',
+     border: '1px solid #dbeafe',
    },
    campaignCard: {
      backgroundColor: 'white',
@@ -504,18 +617,17 @@ export default function SubscriptionPage() {
      color: '#166534',
      lineHeight: 1.6,
    },
-   skipButton: {
-     display: 'block',
-     margin: '0 auto',
-     padding: isMobile ? '10px 20px' : '12px 24px',
-     borderRadius: isMobile ? '8px' : '10px',
-     border: 'none',
-     backgroundColor: 'transparent',
-     color: '#6b7280',
+   webPromotionCard: {
+     backgroundColor: '#fef3c7',
+     borderRadius: isMobile ? '10px' : '12px',
+     padding: isMobile ? '16px' : '20px',
+     marginBottom: isMobile ? '20px' : '32px',
+     border: '1px solid #fcd34d',
+   },
+   webPromotionContent: {
      fontSize: isMobile ? '13px' : '14px',
-     fontWeight: '500',
-     cursor: 'pointer',
-     transition: 'all 0.2s',
+     color: '#78350f',
+     lineHeight: 1.6,
    },
    footer: {
      textAlign: 'center' as const,
@@ -598,6 +710,13 @@ export default function SubscriptionPage() {
      gap: isMobile ? '6px' : '8px',
      transition: 'all 0.2s',
    },
+   closeButton: {
+     padding: isMobile ? '4px' : '6px',
+     backgroundColor: 'transparent',
+     border: 'none',
+     cursor: 'pointer',
+     color: '#3b82f6',
+   },
  };
 
  if (authLoading) {
@@ -662,6 +781,19 @@ export default function SubscriptionPage() {
          </p>
        </div>
 
+       {/* アプリ環境での通知 */}
+       {platform === 'app' && (
+         <div style={styles.appNotice}>
+           <AlertCircle size={isMobile ? 16 : 20} color="#2563eb" style={styles.alertIcon} />
+           <div style={styles.alertContent}>
+             <strong>アプリ内購入について</strong>
+             <br />
+             購入はApp Store/Google Playを通じて安全に処理されます。
+             Web版・アプリ版どちらで購入しても、すべての端末でご利用いただけます。
+           </div>
+         </div>
+       )}
+
        {/* 新規ユーザー向けウェルカムメッセージ */}
        {isNewUser && (
          <div style={{ ...styles.alert, backgroundColor: '#dcfce7', borderColor: '#86efac' }}>
@@ -690,107 +822,109 @@ export default function SubscriptionPage() {
          </button>
        </div>
        
-       {/* キャンペーンコード入力欄 */}
-       <div style={styles.campaignCard}>
-         <div style={styles.campaignHeader}>
-           <div style={styles.campaignIcon}>
-             <Tag size={isMobile ? 20 : 24} color="white" />
-           </div>
-           <div style={styles.campaignContent}>
-             <h3 style={styles.campaignTitle}>
-               キャンペーンコードをお持ちの方
-               <Sparkles size={isMobile ? 14 : 16} color="#f59e0b" className="animate-pulse" />
-             </h3>
-             <p style={styles.campaignDescription}>
-               特別キャンペーンコードで初月無料！今すぐ始めましょう
-             </p>
-           </div>
-         </div>
-         
-         <div style={styles.campaignInput}>
-           <input
-             style={styles.input}
-             placeholder="例: AISTUDY2024"
-             value={campaignCode}
-             onChange={(e) => {
-               setCampaignCode(e.target.value.toUpperCase());
-               setShowCampaignNotice(false);
-             }}
-             disabled={isLoading}
-             onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
-             onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-           />
-           <button
-             style={{
-               ...styles.campaignButton,
-               opacity: isLoading || !campaignCode.trim() ? 0.6 : 1,
-               cursor: isLoading || !campaignCode.trim() ? 'not-allowed' : 'pointer',
-             }}
-             onClick={() => handleCheckout(true)}
-             disabled={isLoading || !campaignCode.trim()}
-             onMouseEnter={(e) => {
-               if (!isLoading && campaignCode.trim()) {
-                 e.currentTarget.style.backgroundColor = '#7c3aed';
-               }
-             }}
-             onMouseLeave={(e) => {
-               e.currentTarget.style.backgroundColor = '#8b5cf6';
-             }}
-           >
-             {isLoading ? (
-               <>
-                 <Loader2 size={isMobile ? 14 : 16} className="animate-spin" />
-                 処理中...
-               </>
-             ) : (
-               'コードを使用して始める'
-             )}
-           </button>
-         </div>
-         
-         {/* キャンペーンコード使用時の注意書き */}
-         {showCampaignNotice && (
-           <div style={styles.campaignNotice}>
-             <div style={styles.noticeText}>
-               <strong>ご確認ください：</strong>
-               <br />
-               キャンペーンコードを使用すると初月は無料となりますが、
-               <span style={{ fontWeight: '700', color: '#92400e' }}>2ヶ月目以降は月額980円が自動的に請求されます。</span>
-               いつでもキャンセル可能です。
+       {/* キャンペーンコード入力欄 - Web版のみ表示 */}
+       {platform === 'web' && (
+         <div style={styles.campaignCard}>
+           <div style={styles.campaignHeader}>
+             <div style={styles.campaignIcon}>
+               <Tag size={isMobile ? 20 : 24} color="white" />
              </div>
-             <div style={styles.noticeButtons}>
-               <button
-                 style={{ ...styles.noticeButton, ...styles.primaryNoticeButton }}
-                 onClick={() => {
-                   setShowCampaignNotice(false);
-                   handleCheckout(true);
-                 }}
-                 disabled={isLoading}
-                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d97706'}
-                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f59e0b'}
-               >
-                 理解して続ける
-               </button>
-               <button
-                 style={{ ...styles.noticeButton, ...styles.secondaryNoticeButton }}
-                 onClick={() => setShowCampaignNotice(false)}
-                 disabled={isLoading}
-                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-               >
-                 キャンセル
-               </button>
+             <div style={styles.campaignContent}>
+               <h3 style={styles.campaignTitle}>
+                 キャンペーンコードをお持ちの方
+                 <Sparkles size={isMobile ? 14 : 16} color="#f59e0b" className="animate-pulse" />
+               </h3>
+               <p style={styles.campaignDescription}>
+                 特別キャンペーンコードで初月無料！今すぐ始めましょう
+               </p>
              </div>
            </div>
-         )}
-       </div>
+           
+           <div style={styles.campaignInput}>
+             <input
+               style={styles.input}
+               placeholder="例: AISTUDY2024"
+               value={campaignCode}
+               onChange={(e) => {
+                 setCampaignCode(e.target.value.toUpperCase());
+                 setShowCampaignNotice(false);
+               }}
+               disabled={isLoading}
+               onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
+               onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+             />
+             <button
+               style={{
+                 ...styles.campaignButton,
+                 opacity: isLoading || !campaignCode.trim() ? 0.6 : 1,
+                 cursor: isLoading || !campaignCode.trim() ? 'not-allowed' : 'pointer',
+               }}
+               onClick={() => handleCheckout(true)}
+               disabled={isLoading || !campaignCode.trim()}
+               onMouseEnter={(e) => {
+                 if (!isLoading && campaignCode.trim()) {
+                   e.currentTarget.style.backgroundColor = '#7c3aed';
+                 }
+               }}
+               onMouseLeave={(e) => {
+                 e.currentTarget.style.backgroundColor = '#8b5cf6';
+               }}
+             >
+               {isLoading ? (
+                 <>
+                   <Loader2 size={isMobile ? 14 : 16} className="animate-spin" />
+                   処理中...
+                 </>
+               ) : (
+                 'コードを使用して始める'
+               )}
+             </button>
+           </div>
+           
+           {/* キャンペーンコード使用時の注意書き */}
+           {showCampaignNotice && (
+             <div style={styles.campaignNotice}>
+               <div style={styles.noticeText}>
+                 <strong>ご確認ください：</strong>
+                 <br />
+                 キャンペーンコードを使用すると初月は無料となりますが、
+                 <span style={{ fontWeight: '700', color: '#92400e' }}>2ヶ月目以降は月額980円が自動的に請求されます。</span>
+                 いつでもキャンセル可能です。
+               </div>
+               <div style={styles.noticeButtons}>
+                 <button
+                   style={{ ...styles.noticeButton, ...styles.primaryNoticeButton }}
+                   onClick={() => {
+                     setShowCampaignNotice(false);
+                     handleCheckout(true);
+                   }}
+                   disabled={isLoading}
+                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d97706'}
+                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f59e0b'}
+                 >
+                   理解して続ける
+                 </button>
+                 <button
+                   style={{ ...styles.noticeButton, ...styles.secondaryNoticeButton }}
+                   onClick={() => setShowCampaignNotice(false)}
+                   disabled={isLoading}
+                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                 >
+                   キャンセル
+                 </button>
+               </div>
+             </div>
+           )}
+         </div>
+       )}
        
        {/* メインプランカード */}
        <div style={styles.mainCard}>
          <div style={styles.planHeader}>
            <div style={styles.planBadge}>
-             <Award size={isMobile ? 12 : 14} />
-             人気No.1
+             {platform === 'app' ? <Smartphone size={isMobile ? 12 : 14} /> : <Award size={isMobile ? 12 : 14} />}
+             {platform === 'app' ? 'アプリ版' : '人気No.1'}
            </div>
            <h2 style={styles.planTitle}>基本プラン</h2>
            <div style={styles.priceContainer}>
@@ -805,6 +939,7 @@ export default function SubscriptionPage() {
            </p>
            <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#9ca3af', marginTop: '4px', marginBottom: '20px' }}>
              ※初月は初期登録費用として500円をいただきます。
+             {platform === 'app' && <><br />※アプリストアの規約により、購入はアプリ内で行う必要があります。</>}
            </p>
            
            {/* CTAボタン */}
@@ -837,7 +972,7 @@ export default function SubscriptionPage() {
                </>
              ) : (
                <>
-                 今すぐ始める
+                 {platform === 'app' ? 'アプリ内で購入' : '今すぐ始める'}
                  <ArrowRight size={isMobile ? 16 : 20} />
                </>
              )}
@@ -867,7 +1002,10 @@ export default function SubscriptionPage() {
              <span>✓ 即時キャンセル可</span>
            </div>
            <p style={styles.paymentNote}>
-             決済はStripeを通じて安全に処理されます
+             {platform === 'app' 
+               ? '決済はApp Store/Google Playを通じて安全に処理されます'
+               : '決済はStripeを通じて安全に処理されます'
+             }
            </p>
          </div>
        </div>
@@ -877,9 +1015,38 @@ export default function SubscriptionPage() {
          <div style={styles.guaranteeContent}>
            <strong>安心の保証：</strong>
            ご満足いただけない場合は、いつでもキャンセル可能です。
-           日割り計算での返金には対応しておりません。
+           {platform === 'app' && 'キャンセルは各ストアのサブスクリプション管理から行えます。'}
          </div>
        </div>
+       
+       {/* Web版のメリット（アプリ環境の場合） */}
+       {platform === 'app' && (
+         <div style={styles.webPromotionCard}>
+           <div style={styles.webPromotionContent}>
+             <strong>💡 Web版のメリット</strong>
+             <br />
+             • クレジットカード決済で管理が簡単
+             <br />
+             • 領収書の発行が可能
+             <br />
+             • 初回登録料500円で全機能をお試し
+             <br />
+             <a
+               href="https://a-istudy-highschool.vercel.app/subscription/register"
+               target="_blank"
+               rel="noopener noreferrer"
+               style={{
+                 color: '#92400e',
+                 textDecoration: 'underline',
+                 marginTop: '8px',
+                 display: 'inline-block',
+               }}
+             >
+               Web版で登録する →
+             </a>
+           </div>
+         </div>
+       )}
        
        {/* フッター */}
        <div style={styles.footer}>
@@ -916,7 +1083,7 @@ export default function SubscriptionPage() {
          <div style={styles.loadingCard}>
            <Loader2 size={isMobile ? 20 : 24} className="animate-spin" />
            <span style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '600', color: '#1f2937' }}>
-             決済ページへ移動しています...
+             {platform === 'app' ? 'アプリ内購入を準備しています...' : '決済ページへ移動しています...'}
            </span>
          </div>
        </div>
