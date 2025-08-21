@@ -1,10 +1,22 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const FAQPage = () => {
   const [openItems, setOpenItems] = useState<{ [key: string]: boolean }>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  // クライアントサイドでのみwindowオブジェクトを使用
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const toggleItem = (itemId: string) => {
     setOpenItems(prev => ({
@@ -146,7 +158,7 @@ const FAQPage = () => {
     }
   ];
 
-  // スタイル定義
+  // スタイル定義（isMobileの状態に基づいて動的に生成）
   const styles = {
     container: {
       minHeight: '100vh',
@@ -156,27 +168,27 @@ const FAQPage = () => {
     wrapper: {
       maxWidth: '1024px',
       margin: '0 auto',
-      padding: window.innerWidth < 640 ? '12px' : '16px',
-      paddingTop: window.innerWidth < 640 ? '16px' : '32px',
-      paddingBottom: window.innerWidth < 640 ? '16px' : '32px'
+      padding: isMobile ? '12px' : '16px',
+      paddingTop: isMobile ? '16px' : '32px',
+      paddingBottom: isMobile ? '16px' : '32px'
     },
     title: {
-      fontSize: window.innerWidth < 640 ? '20px' : '30px',
+      fontSize: isMobile ? '20px' : '30px',
       fontWeight: 'bold',
       textAlign: 'center' as const,
-      marginBottom: window.innerWidth < 640 ? '4px' : '8px',
+      marginBottom: isMobile ? '4px' : '8px',
       color: '#111827'
     },
     subtitle: {
-      fontSize: window.innerWidth < 640 ? '14px' : '20px',
+      fontSize: isMobile ? '14px' : '20px',
       textAlign: 'center' as const,
       color: '#6b7280',
-      marginBottom: window.innerWidth < 640 ? '16px' : '32px'
+      marginBottom: isMobile ? '16px' : '32px'
     },
     sectionsContainer: {
       display: 'flex',
       flexDirection: 'column' as const,
-      gap: window.innerWidth < 640 ? '16px' : '32px'
+      gap: isMobile ? '16px' : '32px'
     },
     sectionCard: {
       backgroundColor: '#ffffff',
@@ -185,10 +197,10 @@ const FAQPage = () => {
       overflow: 'hidden'
     },
     sectionHeader: {
-      fontSize: window.innerWidth < 640 ? '16px' : '20px',
+      fontSize: isMobile ? '16px' : '20px',
       fontWeight: '600',
-      padding: window.innerWidth < 640 ? '12px' : '24px',
-      paddingBottom: window.innerWidth < 640 ? '8px' : '16px',
+      padding: isMobile ? '12px' : '24px',
+      paddingBottom: isMobile ? '8px' : '16px',
       borderBottom: '1px solid #e5e7eb',
       color: '#111827'
     },
@@ -196,7 +208,7 @@ const FAQPage = () => {
       borderTop: '1px solid #e5e7eb'
     },
     itemWrapper: {
-      padding: window.innerWidth < 640 ? '12px' : '24px',
+      padding: isMobile ? '12px' : '24px',
       borderBottom: '1px solid #e5e7eb'
     },
     questionButton: {
@@ -205,7 +217,7 @@ const FAQPage = () => {
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: window.innerWidth < 640 ? '8px' : '16px',
+      gap: isMobile ? '8px' : '16px',
       background: 'none',
       border: 'none',
       cursor: 'pointer',
@@ -215,35 +227,35 @@ const FAQPage = () => {
     },
     questionText: {
       fontWeight: '500',
-      fontSize: window.innerWidth < 640 ? '14px' : '18px',
-      paddingRight: window.innerWidth < 640 ? '4px' : '8px',
+      fontSize: isMobile ? '14px' : '18px',
+      paddingRight: isMobile ? '4px' : '8px',
       lineHeight: 1.5
     },
     chevron: {
       flexShrink: 0,
-      width: window.innerWidth < 640 ? '16px' : '20px',
-      height: window.innerWidth < 640 ? '16px' : '20px',
-      marginTop: window.innerWidth < 640 ? '2px' : '4px',
+      width: isMobile ? '16px' : '20px',
+      height: isMobile ? '16px' : '20px',
+      marginTop: isMobile ? '2px' : '4px',
       transition: 'transform 0.2s'
     },
     chevronRotated: {
       transform: 'rotate(180deg)'
     },
     answerBox: {
-      marginTop: window.innerWidth < 640 ? '8px' : '16px',
-      fontSize: window.innerWidth < 640 ? '12px' : '16px',
+      marginTop: isMobile ? '8px' : '16px',
+      fontSize: isMobile ? '12px' : '16px',
       color: '#4b5563',
       whiteSpace: 'pre-line' as const,
       backgroundColor: '#f9fafb',
-      padding: window.innerWidth < 640 ? '8px' : '16px',
+      padding: isMobile ? '8px' : '16px',
       borderRadius: '6px',
       lineHeight: 1.6
     },
     footer: {
-      marginTop: window.innerWidth < 640 ? '32px' : '48px',
+      marginTop: isMobile ? '32px' : '48px',
       textAlign: 'center' as const,
       color: '#6b7280',
-      fontSize: window.innerWidth < 640 ? '12px' : '14px'
+      fontSize: isMobile ? '12px' : '14px'
     }
   };
 
