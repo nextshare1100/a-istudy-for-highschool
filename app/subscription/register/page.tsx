@@ -26,7 +26,15 @@ import {
 let stripePromise: Promise<any>;
 const getStripe = () => {
  if (!stripePromise) {
-   stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+   console.log('Stripe Publishable Key exists:', !!key);
+   console.log('Key prefix:', key?.substring(0, 7));
+   
+   if (!key) {
+     console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined');
+     throw new Error('Stripe公開キーが設定されていません');
+   }
+   stripePromise = loadStripe(key);
  }
  return stripePromise;
 };
@@ -157,6 +165,10 @@ export default function SubscriptionPage() {
      
      const { sessionId } = await response.json();
      
+     if (!sessionId) {
+       throw new Error('セッションIDが取得できませんでした');
+     }
+     
      // Stripe Checkout にリダイレクト
      const stripe = await getStripe();
      if (!stripe) {
@@ -170,7 +182,11 @@ export default function SubscriptionPage() {
        throw error;
      }
    } catch (error: any) {
-     console.error('Checkout error:', error);
+     console.error('Checkout error details:', {
+       message: error.message,
+       stack: error.stack,
+       type: error.type
+     });
      alert(error.message || '決済処理中にエラーが発生しました');
    } finally {
      setIsLoading(false);
