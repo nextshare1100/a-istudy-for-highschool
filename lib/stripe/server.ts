@@ -1,11 +1,17 @@
 import Stripe from 'stripe';
 
 // デバッグ用ログ
-console.log('Stripe initialization - STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
-console.log('Stripe initialization - Key prefix:', process.env.STRIPE_SECRET_KEY?.substring(0, 7));
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+console.log('Stripe initialization - Key exists:', !!stripeKey);
+console.log('Stripe initialization - Key type:', typeof stripeKey);
+console.log('Stripe initialization - Key length:', stripeKey?.length);
+
+if (!stripeKey) {
+  throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+}
 
 // サーバーサイドStripeクライアント
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+export const stripe = new Stripe(stripeKey, {
   apiVersion: '2023-10-16',
   typescript: true,
 });
