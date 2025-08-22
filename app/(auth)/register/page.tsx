@@ -1,9 +1,30 @@
 'use client'
 
-import { RegisterForm } from '@/components/auth/register-form';
+export const dynamic = 'force-dynamic';
+
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Sparkles, CheckCircle, Gift, Zap, Brain, GraduationCap, Target, BookOpen, TrendingUp, Users, Info, ArrowRight, Shield } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+// RegisterFormの動的インポート
+const RegisterForm = dynamic(
+  () => import('@/components/auth/register-form').then(mod => mod.RegisterForm),
+  { 
+    ssr: false,
+    loading: () => (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '200px',
+        color: '#6b7280'
+      }}>
+        読み込み中...
+      </div>
+    )
+  }
+);
 
 export default function RegisterPage() {
   const [isMobile, setIsMobile] = useState(false);

@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -43,21 +45,25 @@ const getPlatform = () => {
 
 const isAppEnvironment = () => getPlatform() === 'app';
 
-// Stripe設定をファイル内に含める
-let stripePromise: Promise<any>;
-const getStripe = () => {
- if (!stripePromise) {
-   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-   console.log('Stripe Publishable Key exists:', !!key);
-   console.log('Key prefix:', key?.substring(0, 7));
-   
-   if (!key) {
-     console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined');
-     throw new Error('Stripe公開キーが設定されていません');
-   }
-   stripePromise = loadStripe(key);
- }
- return stripePromise;
+// Stripe設定をファイル内に含める - 修正版
+let stripePromise: Promise<any> | null = null;
+const getStripe = async () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  if (!stripePromise) {
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    console.log('Stripe Publishable Key exists:', !!key);
+    console.log('Key prefix:', key?.substring(0, 7));
+    
+    if (!key) {
+      console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined');
+      throw new Error('Stripe公開キーが設定されていません');
+    }
+    stripePromise = loadStripe(key);
+  }
+  return stripePromise;
 };
 
 export default function SubscriptionPage() {
@@ -140,6 +146,8 @@ export default function SubscriptionPage() {
  const [isNewUser, setIsNewUser] = useState(false);
  
  useEffect(() => {
+   if (typeof window === 'undefined') return;
+   
    const searchParams = new URLSearchParams(window.location.search);
    setIsNewUser(searchParams.get('welcome') === 'true');
    

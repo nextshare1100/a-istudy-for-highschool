@@ -1,319 +1,561 @@
-// ========== 基本的なサブスクリプション型 ==========
+// ========== データモデル定義 ==========
+// models/User.ts
+import mongoose from 'mongoose';
 
-export interface UserSubscription {
-  userId: string;
-  stripeCustomerId?: string;
-  subscriptionId?: string;
-  status: 'free' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
-  priceId?: string;
-  currentPeriodEnd?: Date;
-  cancelAtPeriodEnd?: boolean;
-  trialEndsAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PaymentHistory {
-  id: string;
-  userId: string;
-  amount: number;
-  currency: string;
-  status: 'succeeded' | 'pending' | 'failed';
-  description: string;
-  invoiceUrl?: string;
-  createdAt: Date;
-}
-
-export interface SubscriptionFeatures {
-  aiQuestionsLimit: number | 'unlimited';
-  detailedAnalytics: boolean;
-  personalizedPlan: boolean;
-  prioritySupport: boolean;
-  offlineAccess: boolean;
-}
-
-export const FREE_FEATURES: SubscriptionFeatures = {
-  aiQuestionsLimit: 10,
-  detailedAnalytics: false,
-  personalizedPlan: false,
-  prioritySupport: false,
-  offlineAccess: false,
-};
-
-export const PREMIUM_FEATURES: SubscriptionFeatures = {
-  aiQuestionsLimit: 'unlimited',
-  detailedAnalytics: true,
-  personalizedPlan: true,
-  prioritySupport: true,
-  offlineAccess: true,
-};
-
-// ========== キャンペーンコード関連 ==========
-
-export interface CampaignCode {
-  id?: string;
-  code: string;
-  type: 'first_month_free' | 'three_months_free' | 'percentage' | 'fixed_amount';
-  stripeCouponId: string;
-  stripePromotionCodeId?: string;
-  discountValue?: number; // percentageやfixed_amountの場合の値
-  validUntil: Date;
-  usageLimit: number;
-  usedCount: number;
-  description?: string;
-  metadata?: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CampaignUsage {
-  id?: string;
-  userId: string;
-  campaignCodeId: string;
-  code: string;
-  appliedAt: Date;
-  subscriptionId?: string;
-}
-
-// ========== 法人契約関連 ==========
-
-export interface SchoolContract {
-  id?: string;
-  schoolId: string;
-  schoolName: string;
-  schoolNameKana?: string;
-  emailDomains: string[]; // 例: ["school.ac.jp"]
-  contractType: 'full' | 'partial';
-  startDate: Date;
-  endDate?: Date; // 契約終了日（オプション）
-  monthlyFee: number;
-  studentCount?: number; // 想定学生数
-  actualStudentCount?: number; // 実際の利用学生数
-  status: 'active' | 'pending' | 'canceled' | 'expired';
-  adminIds: string[]; // 管理者ユーザーID
-  features?: SchoolContractFeatures;
-  billingInfo?: BillingInfo;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface SchoolContractFeatures {
-  maxStudents?: number;
-  customBranding?: boolean;
-  dedicatedSupport?: boolean;
-  dataExport?: boolean;
-  ssoEnabled?: boolean;
-}
-
-export interface BillingInfo {
-  contactName: string;
-  contactEmail: string;
-  contactPhone?: string;
-  address?: {
-    line1: string;
-    line2?: string;
-    city: string;
-    state?: string;
-    postalCode: string;
-    country: string;
-  };
-  taxId?: string;
-}
-
-// ========== 移行・通知関連 ==========
-
-export interface MigrationNotification {
-  id?: string;
-  userId: string;
-  type: 'school_contract_available' | 'migration_complete' | 'migration_reminder';
-  title: string;
-  message: string;
-  schoolName: string;
-  schoolId: string;
-  actions?: {
-    label: string;
-    action: 'migrate' | 'keep' | 'dismiss';
-    url?: string;
-  }[];
-  read: boolean;
-  readAt?: Date;
-  expiresAt?: Date; // 通知の有効期限
-  createdAt: Date;
-}
-
-export interface UserMigrationStatus {
-  userId: string;
-  previousStatus: 'personal' | 'free';
-  currentStatus: 'school' | 'personal';
-  schoolId?: string;
-  migratedAt?: Date;
-  declinedAt?: Date;
-  refundAmount?: number;
-  originalSubscriptionId?: string;
-}
-
-// ========== 拡張ユーザー型 ==========
-
-export interface ExtendedUser {
-  uid: string;
-  email: string;
-  displayName?: string;
-  photoURL?: string;
+const UserSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  platform: { type: String, enum: ['web', 'ios', 'android'], required: true },
   
-  // サブスクリプション関連
-  stripeCustomerId?: string;
-  subscriptionStatus?: UserSubscription['status'];
-  subscriptionId?: string;
+  // 認証情報
+  firebaseUid: { type: String, required: true, unique: true },
   
-  // 学校関連
-  schoolId?: string;
-  accountStatus: 'personal' | 'school' | 'migrating';
+  // サブスクリプション状態
+  subscriptionStatus: {
+    type: String,
+    enum: ['free', 'trial', 'active', 'cancelled', 'expired'],
+    default: 'free'
+  },
   
-  // キャンペーン関連
-  appliedCampaignCode?: string;
-  appliedCampaignAt?: Date;
+  // プラットフォーム別の決済情報
+  paymentInfo: {
+    // Web (Stripe)
+    stripeCustomerId: String,
+    stripeSubscriptionId: String,
+    
+    // iOS
+    iosTransactionId: String,
+    iosOriginalTransactionId: String,
+    iosReceiptData: String,
+    
+    // Android
+    androidPurchaseToken: String,
+    androidOrderId: String,
+    androidProductId: String
+  },
   
-  // 移行関連
-  originalSubscriptionId?: string;
-  migratedAt?: Date;
-  declinedSchoolMigration?: boolean;
-  declinedSchoolId?: string;
-  declinedAt?: Date;
+  // 共通のサブスクリプション情報
+  subscription: {
+    startDate: Date,
+    endDate: Date,
+    nextBillingDate: Date,
+    registrationFeePaid: { type: Boolean, default: false },
+    registrationFeeDate: Date,
+    trialEndDate: Date
+  },
   
-  // システム情報
-  role?: 'user' | 'admin' | 'school_admin';
-  createdAt: Date;
-  updatedAt: Date;
+  // クーポン情報
+  appliedCoupon: {
+    code: String,
+    type: { type: String, enum: ['trial_30days', 'discount_50', 'discount_100'] },
+    appliedAt: Date
+  },
+  
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+export const User = mongoose.model('User', UserSchema);
+
+// ========== クーポンモデル ==========
+// models/Coupon.ts
+const CouponSchema = new mongoose.Schema({
+  code: { type: String, required: true, unique: true },
+  type: { 
+    type: String, 
+    enum: ['trial_30days', 'discount_50', 'discount_100'],
+    required: true 
+  },
+  description: String,
+  validFrom: { type: Date, default: Date.now },
+  validUntil: Date,
+  maxUses: { type: Number, default: -1 }, // -1 = 無制限
+  usedCount: { type: Number, default: 0 },
+  platforms: [{ type: String, enum: ['web', 'ios', 'android', 'all'] }],
+  isActive: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const Coupon = mongoose.model('Coupon', CouponSchema);
+
+// ========== Stripe決済処理 (Web用) ==========
+// services/stripe-service.ts
+import Stripe from 'stripe';
+import { User } from '../models/User';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+});
+
+export class StripeService {
+  // Stripeチェックアウトセッション作成
+  static async createCheckoutSession(userId: string, couponCode?: string) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+    
+    // 既存の顧客IDがあれば使用、なければ新規作成
+    let customerId = user.paymentInfo?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { userId: user._id.toString() }
+      });
+      customerId = customer.id;
+      user.paymentInfo.stripeCustomerId = customerId;
+      await user.save();
+    }
+    
+    // 基本的なセッションパラメータ
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      customer: customerId,
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{
+        price: process.env.STRIPE_PRICE_ID_MONTHLY!,
+        quantity: 1
+      }],
+      success_url: `${process.env.APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL}/payment/cancel`,
+      metadata: {
+        userId: user._id.toString(),
+        platform: 'web'
+      }
+    };
+    
+    // クーポンコードの処理
+    if (couponCode) {
+      const coupon = await this.validateCoupon(couponCode);
+      if (coupon.type === 'trial_30days') {
+        sessionParams.subscription_data = {
+          trial_period_days: 30,
+          metadata: { couponCode }
+        };
+      } else {
+        // Stripeクーポンを適用
+        sessionParams.discounts = [{
+          coupon: couponCode.toUpperCase()
+        }];
+      }
+    }
+    
+    const session = await stripe.checkout.sessions.create(sessionParams);
+    return session;
+  }
+  
+  // Webhookイベント処理
+  static async handleWebhook(event: Stripe.Event) {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        break;
+      
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+        await this.handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+        break;
+    }
+  }
+  
+  private static async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+    const userId = session.metadata?.userId;
+    if (!userId) return;
+    
+    const user = await User.findById(userId);
+    if (!user) return;
+    
+    // サブスクリプション情報を取得
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+    
+    user.paymentInfo.stripeSubscriptionId = subscription.id;
+    user.subscriptionStatus = subscription.status === 'trialing' ? 'trial' : 'active';
+    user.subscription = {
+      startDate: new Date(subscription.current_period_start * 1000),
+      endDate: new Date(subscription.current_period_end * 1000),
+      nextBillingDate: new Date(subscription.current_period_end * 1000),
+      registrationFeePaid: true,
+      registrationFeeDate: new Date()
+    };
+    
+    await user.save();
+  }
+  
+  private static async validateCoupon(code: string) {
+    const coupon = await Coupon.findOne({ 
+      code: code.toUpperCase(),
+      isActive: true,
+      $or: [
+        { platforms: 'all' },
+        { platforms: 'web' }
+      ]
+    });
+    
+    if (!coupon) throw new Error('Invalid coupon code');
+    if (coupon.validUntil && coupon.validUntil < new Date()) {
+      throw new Error('Coupon has expired');
+    }
+    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
+      throw new Error('Coupon usage limit reached');
+    }
+    
+    return coupon;
+  }
 }
 
-// ========== Stripe関連の型 ==========
+// ========== iOS/Android アプリ内購入処理 ==========
+// services/iap-service.ts
+import { User } from '../models/User';
+import fetch from 'node-fetch';
 
-export interface StripeCustomer {
-  id: string;
-  userId: string;
-  email: string;
-  name?: string;
-  defaultPaymentMethodId?: string;
-  currency?: string;
-  createdAt: Date;
-  updatedAt: Date;
+export class IAPService {
+  // iOS レシート検証
+  static async verifyIOSReceipt(receiptData: string, userId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+    
+    // Apple検証エンドポイント
+    const verifyUrl = process.env.NODE_ENV === 'production'
+      ? 'https://buy.itunes.apple.com/verifyReceipt'
+      : 'https://sandbox.itunes.apple.com/verifyReceipt';
+    
+    const response = await fetch(verifyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'receipt-data': receiptData,
+        'password': process.env.APPLE_SHARED_SECRET
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.status !== 0) {
+      throw new Error(`Apple receipt validation failed: ${result.status}`);
+    }
+    
+    // レシートから購入情報を抽出
+    const latestReceipt = result.latest_receipt_info?.[0];
+    if (!latestReceipt) {
+      throw new Error('No purchase found in receipt');
+    }
+    
+    // 初回登録料の購入を確認
+    const registrationFeePurchase = result.latest_receipt_info.find(
+      (item: any) => item.product_id === process.env.IOS_REGISTRATION_FEE_ID
+    );
+    
+    // 月額サブスクリプションの購入を確認
+    const subscriptionPurchase = result.latest_receipt_info.find(
+      (item: any) => item.product_id === process.env.IOS_SUBSCRIPTION_ID
+    );
+    
+    // ユーザー情報を更新
+    user.platform = 'ios';
+    user.paymentInfo.iosReceiptData = receiptData;
+    
+    if (registrationFeePurchase) {
+      user.paymentInfo.iosTransactionId = registrationFeePurchase.transaction_id;
+      user.paymentInfo.iosOriginalTransactionId = registrationFeePurchase.original_transaction_id;
+      user.subscription.registrationFeePaid = true;
+      user.subscription.registrationFeeDate = new Date(parseInt(registrationFeePurchase.purchase_date_ms));
+    }
+    
+    if (subscriptionPurchase) {
+      const expiresDate = new Date(parseInt(subscriptionPurchase.expires_date_ms));
+      user.subscriptionStatus = expiresDate > new Date() ? 'active' : 'expired';
+      user.subscription.startDate = new Date(parseInt(subscriptionPurchase.original_purchase_date_ms));
+      user.subscription.endDate = expiresDate;
+      user.subscription.nextBillingDate = expiresDate;
+    }
+    
+    await user.save();
+    
+    return {
+      success: true,
+      registrationFeePaid: !!registrationFeePurchase,
+      subscriptionActive: user.subscriptionStatus === 'active',
+      expiresAt: user.subscription.endDate
+    };
+  }
+  
+  // Android購入検証
+  static async verifyAndroidPurchase(purchaseToken: string, productId: string, userId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+    
+    // Google Play APIクライアントの初期化
+    const { google } = require('googleapis');
+    const auth = new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
+      scopes: ['https://www.googleapis.com/auth/androidpublisher']
+    });
+    
+    const androidPublisher = google.androidpublisher({
+      version: 'v3',
+      auth: await auth.getClient()
+    });
+    
+    try {
+      let purchaseData;
+      
+      // 製品タイプに応じて適切なAPIを使用
+      if (productId === process.env.ANDROID_REGISTRATION_FEE_ID) {
+        // 一回限りの購入（登録料）
+        const response = await androidPublisher.purchases.products.get({
+          packageName: process.env.ANDROID_PACKAGE_NAME,
+          productId: productId,
+          token: purchaseToken
+        });
+        purchaseData = response.data;
+        
+        if (purchaseData.purchaseState === 0) { // 0 = 購入済み
+          user.subscription.registrationFeePaid = true;
+          user.subscription.registrationFeeDate = new Date(parseInt(purchaseData.purchaseTimeMillis));
+          user.paymentInfo.androidOrderId = purchaseData.orderId;
+        }
+      } else if (productId === process.env.ANDROID_SUBSCRIPTION_ID) {
+        // サブスクリプション
+        const response = await androidPublisher.purchases.subscriptions.get({
+          packageName: process.env.ANDROID_PACKAGE_NAME,
+          subscriptionId: productId,
+          token: purchaseToken
+        });
+        purchaseData = response.data;
+        
+        const expiryTime = new Date(parseInt(purchaseData.expiryTimeMillis));
+        user.subscriptionStatus = expiryTime > new Date() ? 'active' : 'expired';
+        user.subscription.startDate = new Date(parseInt(purchaseData.startTimeMillis));
+        user.subscription.endDate = expiryTime;
+        user.subscription.nextBillingDate = expiryTime;
+      }
+      
+      user.platform = 'android';
+      user.paymentInfo.androidPurchaseToken = purchaseToken;
+      user.paymentInfo.androidProductId = productId;
+      
+      await user.save();
+      
+      return {
+        success: true,
+        registrationFeePaid: user.subscription.registrationFeePaid,
+        subscriptionActive: user.subscriptionStatus === 'active',
+        expiresAt: user.subscription.endDate
+      };
+    } catch (error) {
+      console.error('Android purchase verification failed:', error);
+      throw new Error('Purchase verification failed');
+    }
+  }
+  
+  // クーポンコード適用（iOS/Android用）
+  static async applyCoupon(userId: string, couponCode: string, platform: 'ios' | 'android') {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+    
+    // 既にクーポンが適用されている場合はエラー
+    if (user.appliedCoupon?.code) {
+      throw new Error('Coupon already applied');
+    }
+    
+    // クーポンの検証
+    const coupon = await Coupon.findOne({
+      code: couponCode.toUpperCase(),
+      isActive: true,
+      $or: [
+        { platforms: 'all' },
+        { platforms: platform }
+      ]
+    });
+    
+    if (!coupon) throw new Error('Invalid coupon code');
+    if (coupon.validUntil && coupon.validUntil < new Date()) {
+      throw new Error('Coupon has expired');
+    }
+    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
+      throw new Error('Coupon usage limit reached');
+    }
+    
+    // クーポンを適用
+    user.appliedCoupon = {
+      code: coupon.code,
+      type: coupon.type,
+      appliedAt: new Date()
+    };
+    
+    // クーポンタイプに応じた処理
+    if (coupon.type === 'trial_30days') {
+      // 30日間の無料トライアル
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 30);
+      
+      user.subscriptionStatus = 'trial';
+      user.subscription.trialEndDate = trialEndDate;
+      user.subscription.startDate = new Date();
+      user.subscription.endDate = trialEndDate;
+      user.subscription.nextBillingDate = trialEndDate;
+    }
+    
+    // クーポン使用回数を更新
+    coupon.usedCount += 1;
+    await coupon.save();
+    
+    await user.save();
+    
+    return {
+      success: true,
+      message: 'Coupon applied successfully',
+      trialEndDate: user.subscription.trialEndDate
+    };
+  }
 }
 
-export interface PaymentMethod {
-  id: string;
-  customerId: string;
-  type: 'card';
-  card?: {
-    brand: string;
-    last4: string;
-    expMonth: number;
-    expYear: number;
-    funding?: string;
-  };
-  isDefault: boolean;
-  createdAt: Date;
-}
+// ========== REST APIエンドポイント ==========
+// routes/payment.routes.ts
+import express from 'express';
+import { authenticateUser } from '../middleware/auth';
+import { StripeService } from '../services/stripe-service';
+import { IAPService } from '../services/iap-service';
 
-// ========== API関連の型 ==========
+const router = express.Router();
 
-export interface CheckoutSessionParams {
-  userId: string;
-  userEmail: string;
-  priceId: string;
-  successUrl: string;
-  cancelUrl: string;
-  campaignCode?: string;
-  metadata?: Record<string, string>;
-}
+// Web: Stripeチェックアウトセッション作成
+router.post('/web/create-checkout', authenticateUser, async (req, res) => {
+  try {
+    const { couponCode } = req.body;
+    const session = await StripeService.createCheckoutSession(req.user.id, couponCode);
+    
+    res.json({
+      success: true,
+      sessionId: session.id,
+      url: session.url
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-export interface PortalSessionParams {
-  customerId: string;
-  returnUrl: string;
-}
+// Web: Stripe Webhook
+router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'] as string;
+  
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+    
+    await StripeService.handleWebhook(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).json({ error: 'Webhook error' });
+  }
+});
 
-export interface CreateSubscriptionParams {
-  customerId: string;
-  priceId: string;
-  trialPeriodDays?: number;
-  couponId?: string;
-  metadata?: Record<string, string>;
-}
+// iOS: レシート検証
+router.post('/ios/verify-receipt', authenticateUser, async (req, res) => {
+  try {
+    const { receiptData } = req.body;
+    const result = await IAPService.verifyIOSReceipt(receiptData, req.user.id);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-// ========== レスポンス型 ==========
+// Android: 購入検証
+router.post('/android/verify-purchase', authenticateUser, async (req, res) => {
+  try {
+    const { purchaseToken, productId } = req.body;
+    const result = await IAPService.verifyAndroidPurchase(
+      purchaseToken,
+      productId,
+      req.user.id
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-export interface SubscriptionStatusResponse {
-  isActive: boolean;
-  status: UserSubscription['status'];
-  features: SubscriptionFeatures;
-  currentPeriodEnd?: Date;
-  cancelAtPeriodEnd?: boolean;
-  trialEnd?: Date;
-  schoolAccount?: {
-    schoolName: string;
-    schoolId: string;
-  };
-}
+// 共通: クーポン適用（iOS/Android）
+router.post('/apply-coupon', authenticateUser, async (req, res) => {
+  try {
+    const { couponCode, platform } = req.body;
+    
+    if (!['ios', 'android'].includes(platform)) {
+      throw new Error('Invalid platform');
+    }
+    
+    const result = await IAPService.applyCoupon(
+      req.user.id,
+      couponCode,
+      platform as 'ios' | 'android'
+    );
+    
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-export interface ValidationResponse<T = any> {
-  isValid: boolean;
-  data?: T;
-  error?: string;
-  errorCode?: string;
-}
+// 共通: サブスクリプション状態確認
+router.get('/subscription-status', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) throw new Error('User not found');
+    
+    res.json({
+      status: user.subscriptionStatus,
+      platform: user.platform,
+      registrationFeePaid: user.subscription?.registrationFeePaid || false,
+      endDate: user.subscription?.endDate,
+      nextBillingDate: user.subscription?.nextBillingDate,
+      appliedCoupon: user.appliedCoupon
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-export interface MigrationResponse {
-  success: boolean;
-  refundAmount?: number;
-  error?: string;
-  nextSteps?: string[];
-}
+export default router;
 
-// ========== 定数 ==========
+// ========== 環境変数設定例 (.env) ==========
+/*
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/myapp
 
-export const SUBSCRIPTION_STATUSES = {
-  FREE: 'free',
-  TRIALING: 'trialing',
-  ACTIVE: 'active',
-  PAST_DUE: 'past_due',
-  CANCELED: 'canceled',
-  UNPAID: 'unpaid',
-} as const;
+# Stripe (Web決済)
+STRIPE_SECRET_KEY=sk_live_xxxxx
+STRIPE_PRICE_ID_MONTHLY=price_xxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
-export const ACCOUNT_STATUSES = {
-  PERSONAL: 'personal',
-  SCHOOL: 'school',
-  MIGRATING: 'migrating',
-} as const;
+# Apple (iOS)
+APPLE_SHARED_SECRET=xxxxx
+IOS_REGISTRATION_FEE_ID=com.myapp.registration_fee
+IOS_SUBSCRIPTION_ID=com.myapp.monthly_subscription
 
-export const CAMPAIGN_TYPES = {
-  FIRST_MONTH_FREE: 'first_month_free',
-  THREE_MONTHS_FREE: 'three_months_free',
-  PERCENTAGE: 'percentage',
-  FIXED_AMOUNT: 'fixed_amount',
-} as const;
+# Google (Android)
+GOOGLE_SERVICE_ACCOUNT_KEY_PATH=./google-service-account.json
+ANDROID_PACKAGE_NAME=com.myapp
+ANDROID_REGISTRATION_FEE_ID=registration_fee
+ANDROID_SUBSCRIPTION_ID=monthly_subscription
 
-// ========== ユーティリティ型 ==========
-
-export type SubscriptionStatus = UserSubscription['status'];
-export type AccountStatus = ExtendedUser['accountStatus'];
-export type CampaignType = CampaignCode['type'];
-
-// 機能制限チェック用のヘルパー型
-export type FeatureKey = keyof SubscriptionFeatures;
-
-// サブスクリプション状態の判定ヘルパー
-export const isSubscriptionActive = (status: SubscriptionStatus): boolean => {
-  return status === 'active' || status === 'trialing';
-};
-
-export const isPaidSubscription = (status: SubscriptionStatus): boolean => {
-  return status === 'active';
-};
-
-export const canUseFeature = (
-  features: SubscriptionFeatures,
-  featureKey: FeatureKey
-): boolean => {
-  const value = features[featureKey];
-  return value === true || value === 'unlimited' || (typeof value === 'number' && value > 0);
-};
+# App
+APP_URL=https://myapp.com
+JWT_SECRET=xxxxx
+*/
