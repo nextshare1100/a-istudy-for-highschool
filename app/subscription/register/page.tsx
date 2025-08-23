@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { loadStripe } from '@stripe/stripe-js';
+import { DevModeIndicator } from '@/components/DevModeIndicator';
+import { PaymentTestButtons } from '@/components/PaymentTestButtons';
 import { 
  CheckCircle2, 
  Tag, 
@@ -1096,6 +1098,10 @@ export default function SubscriptionPage() {
          </div>
        </div>
      )}
+
+     {/* 開発モード用コンポーネント */}
+     <DevModeIndicator />
+     <PaymentTestButtons />
 
      <style jsx>{`
        @keyframes spin {

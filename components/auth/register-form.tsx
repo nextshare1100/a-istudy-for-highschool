@@ -39,16 +39,27 @@ export function RegisterForm() {
   // 登録ボタンが有効かどうか
   const canRegister = isFormValid && allAgreed && !loading
 
-  // モバイル判定
+  // モバイル判定 - SSR対応
   const [isMobile, setIsMobile] = useState(false)
+  const [isClient, setIsClient] = useState(false)
   
   useEffect(() => {
+    // クライアントサイドでのみ実行
+    setIsClient(true)
+    
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 768)
+      }
     }
+    
     checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    
+    // イベントリスナーもクライアントサイドでのみ追加
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile)
+      return () => window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   // スタイル定義（モバイル対応）
@@ -352,8 +363,11 @@ export function RegisterForm() {
         description: 'プランを選択してください',
       })
       
+      // SSR対応: windowオブジェクトの存在を確認
       setTimeout(() => {
-        window.location.href = 'https://a-istudy-highschool.vercel.app/subscription/register?welcome=true';
+        if (typeof window !== 'undefined') {
+          window.location.href = 'https://a-istudy-highschool.vercel.app/subscription/register?welcome=true';
+        }
       }, 1500);
       
     } catch (err: any) {
@@ -381,6 +395,21 @@ export function RegisterForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // SSR中はローディング状態を表示
+  if (!isClient) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '400px',
+        color: '#6B7280'
+      }}>
+        <div>読み込み中...</div>
+      </div>
+    )
   }
 
   return (

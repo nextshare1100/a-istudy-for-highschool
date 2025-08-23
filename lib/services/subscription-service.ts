@@ -2,6 +2,9 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from '
 import { db, auth } from '@/lib/firebase/config';
 import type { UserSubscription } from '@/types/subscription';
 
+// 開発モードの判定
+const isDevelopmentMode = process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE === 'true';
+
 export const subscriptionService = {
   // 現在のサブスクリプションを取得（全プラットフォーム対応）
   async getCurrentSubscription(userId: string): Promise<UserSubscription | null> {
@@ -110,6 +113,37 @@ export const subscriptionService = {
   
   // iOS レシート検証
   async verifyIOSReceipt(receiptData: string): Promise<any> {
+    // 開発モードの場合はモックレスポンスを返す
+    if (isDevelopmentMode) {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+      
+      // モックサブスクリプションを作成
+      const mockSubscription = {
+        userId: user.uid,
+        platform: 'ios' as const,
+        status: 'active' as const,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
+        iosReceiptData: 'mock_receipt_data',
+        iosTransactionId: 'mock_transaction_' + Date.now(),
+        productId: 'com.aistudy.monthly_subscription',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Firestoreに保存（開発環境では権限エラーを無視）
+      try {
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'subscriptions', user.uid), mockSubscription);
+      } catch (error) {
+        // 開発環境では権限エラーを無視
+      }
+      
+      return { success: true, subscription: mockSubscription };
+    }
+    
+    // 本番環境の処理
     const token = await this.getAuthToken();
     if (!token) throw new Error('Not authenticated');
     
@@ -132,6 +166,37 @@ export const subscriptionService = {
   
   // Android 購入検証
   async verifyAndroidPurchase(purchaseToken: string, productId: string): Promise<any> {
+    // 開発モードの場合はモックレスポンスを返す
+    if (isDevelopmentMode) {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+      
+      // モックサブスクリプションを作成
+      const mockSubscription = {
+        userId: user.uid,
+        platform: 'android' as const,
+        status: 'active' as const,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
+        androidPurchaseToken: 'mock_purchase_token',
+        androidOrderId: 'mock_order_' + Date.now(),
+        productId: productId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Firestoreに保存（開発環境では権限エラーを無視）
+      try {
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'subscriptions', user.uid), mockSubscription);
+      } catch (error) {
+        // 開発環境では権限エラーを無視
+      }
+      
+      return { success: true, subscription: mockSubscription };
+    }
+    
+    // 本番環境の処理
     const token = await this.getAuthToken();
     if (!token) throw new Error('Not authenticated');
     
@@ -319,3 +384,139 @@ export const subscriptionService = {
     });
   }
 };
+
+// 開発モード用のヘルパー関数をエクスポート
+export async function verifyIOSReceipt(
+  userId: string,
+  receipt: string,
+  transactionId: string,
+  productId: string,
+  isSandbox: boolean = true
+): Promise<{ success: boolean; subscription?: any }> {
+  // 開発モードの場合はモックレスポンスを返す
+  if (isDevelopmentMode) {
+    // モックサブスクリプションを作成
+    const mockSubscription = {
+      userId,
+      platform: 'ios' as const,
+      status: 'active' as const,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
+      iosReceiptData: 'mock_receipt_data',
+      iosTransactionId: transactionId,
+      productId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Firestoreに保存（開発環境では権限エラーを無視）
+    try {
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'subscriptions', userId), mockSubscription);
+    } catch (error) {
+      // 開発環境では権限エラーを無視
+    }
+    
+    return { success: true, subscription: mockSubscription };
+  }
+  
+  // 本番環境の処理
+  try {
+    const response = await fetch('/api/payment/ios/verify-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, receipt, transactionId, productId, isSandbox })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'レシート検証に失敗しました');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('iOS receipt verification error:', error);
+    return { success: false };
+  }
+}
+
+// Android購入検証
+export async function verifyAndroidPurchase(
+  userId: string,
+  purchaseToken: string,
+  productId: string,
+  orderId: string
+): Promise<{ success: boolean; subscription?: any }> {
+  // 開発モードの場合はモックレスポンスを返す
+  if (isDevelopmentMode) {
+    // モックサブスクリプションを作成
+    const mockSubscription = {
+      userId,
+      platform: 'android' as const,
+      status: 'active' as const,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
+      androidPurchaseToken: 'mock_purchase_token',
+      androidOrderId: orderId,
+      productId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Firestoreに保存（開発環境では権限エラーを無視）
+    try {
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'subscriptions', userId), mockSubscription);
+    } catch (error) {
+      // 開発環境では権限エラーを無視
+    }
+    
+    return { success: true, subscription: mockSubscription };
+  }
+  
+  // 本番環境の処理
+  try {
+    const response = await fetch('/api/payment/android/verify-purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, purchaseToken, productId, orderId })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '購入検証に失敗しました');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Android purchase verification error:', error);
+    return { success: false };
+  }
+}
+
+// クーポン適用
+export async function applyAppCoupon(
+  userId: string,
+  couponCode: string
+): Promise<{ success: boolean; message: string; discount?: any }> {
+  try {
+    const response = await fetch('/api/payment/apply-coupon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, couponCode })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'クーポンの適用に失敗しました');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Coupon application error:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'クーポンの適用に失敗しました' 
+    };
+  }
+}
