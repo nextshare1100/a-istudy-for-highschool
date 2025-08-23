@@ -36,6 +36,8 @@ export default function App() {
 
   // WebViewからのメッセージ処理
   const handleWebViewMessage = async (event: any) => {
+    console.log('Raw message received:', event.nativeEvent.data);
+    
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('Message from WebView:', data);
@@ -61,53 +63,32 @@ export default function App() {
     }
   };
 
-  // 購入処理
+  // 購入処理（修正版 - リロード機能付き）
   const handlePurchase = async (data: any) => {
-    if (isDevelopment) {
-      Alert.alert(
-        '開発環境',
-        'Simulatorではアプリ内購入をテストできません。\n\n実機でテストするか、Web版でStripe決済をご利用ください。',
-        [
-          {
-            text: 'Web版で購入',
-            onPress: () => {
-              // WebViewに戻るメッセージを送信
-              if (webViewRef.current) {
-                webViewRef.current.postMessage(
-                  JSON.stringify({
-                    type: 'redirectToWeb',
-                    message: 'Simulatorでは購入できません'
-                  })
-                );
-              }
-            }
-          },
-          {
-            text: 'OK',
-            style: 'cancel'
-          }
-        ]
-      );
-      return;
-    }
-    
-    // 本番環境での購入処理
+    console.log('handlePurchase called with:', data);
     setIsPurchasing(true);
     
-    try {
-      // TODO: 実際のIAP実装
-      console.log('本番環境での購入処理', data);
-      
-      // 仮の成功処理
-      setTimeout(() => {
-        setIsPurchasing(false);
-        Alert.alert('購入完了', 'サブスクリプションの登録が完了しました');
-      }, 2000);
-      
-    } catch (err: any) {
+    // 2秒後に成功（開発・本番共通のテスト処理）
+    setTimeout(() => {
       setIsPurchasing(false);
-      Alert.alert('購入エラー', err.message || '購入処理中にエラーが発生しました');
-    }
+      
+      const message = isDevelopment 
+        ? 'テスト購入完了\n開発環境のため、実際の課金は発生しません'
+        : '購入完了\nサブスクリプションの登録が完了しました';
+      
+      Alert.alert('成功', message, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // WebViewをリロードして最新の状態を反映
+            if (webViewRef.current) {
+              console.log('Reloading WebView after purchase success');
+              webViewRef.current.reload();
+            }
+          }
+        }
+      ]);
+    }, 2000);
   };
 
   // 購入の復元
@@ -161,7 +142,7 @@ export default function App() {
 
   // WebViewに初期化完了を通知するJavaScript
   const injectedJavaScript = `
-    window.ReactNativeWebView = true;
+    window.ReactNativeWebView = window.ReactNativeWebView || {};
     window.isNativeApp = true;
     window.isDevelopment = ${isDevelopment};
     
@@ -169,11 +150,6 @@ export default function App() {
     console.log('WebView環境を設定しました');
     console.log('ReactNativeWebView:', window.ReactNativeWebView);
     console.log('isNativeApp:', window.isNativeApp);
-    
-    // デバッグアラート（一時的）
-    setTimeout(() => {
-      alert('アプリ環境検出: ' + (window.ReactNativeWebView ? 'アプリ内' : 'ブラウザ'));
-    }, 1000);
     
     // アプリの準備完了を通知
     window.postMessage(JSON.stringify({ 
@@ -184,7 +160,7 @@ export default function App() {
     
     // 開発環境の場合、コンソールにメッセージ
     if (${isDevelopment}) {
-      console.log('🔧 開発環境で実行中 - アプリ内購入は無効です');
+      console.log('🔧 開発環境で実行中 - アプリ内購入はテストモードです');
     }
     
     true; // 必須
@@ -197,7 +173,7 @@ export default function App() {
       {/* 開発環境の表示 */}
       {isDevelopment && (
         <View style={styles.devBanner}>
-          <Text style={styles.devBannerText}>開発環境 - IAP無効</Text>
+          <Text style={styles.devBannerText}>開発環境 - テストモード</Text>
         </View>
       )}
       
@@ -206,7 +182,11 @@ export default function App() {
         source={{ uri: 'https://a-istudy-highschool.vercel.app' }}
         onMessage={handleWebViewMessage}
         injectedJavaScript={injectedJavaScript}
-        onLoadEnd={() => setIsLoading(false)}
+        onLoadEnd={() => {
+          setIsLoading(false);
+          console.log('WebView loaded successfully');
+        }}
+        onLoadStart={() => console.log('WebView loading started')}
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
@@ -226,6 +206,11 @@ export default function App() {
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.warn('WebView error:', nativeEvent);
+        }}
+        // デバッグ用
+        onHttpError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn('HTTP error:', nativeEvent);
         }}
       />
       
