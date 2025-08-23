@@ -162,6 +162,15 @@ export default function SubscriptionPage() {
  
  // 統合決済処理
  const handleCheckout = async (withCampaignCode: boolean = false) => {
+   // デバッグ情報を追加
+   console.log('=== Payment Debug Info ===');
+   console.log('Platform:', platform);
+   console.log('isAppEnvironment:', isAppEnvironment());
+   console.log('window.ReactNativeWebView:', typeof (window as any).ReactNativeWebView);
+   console.log('window.Capacitor:', typeof (window as any).Capacitor);
+   console.log('window.cordova:', typeof (window as any).cordova);
+   console.log('User Agent:', navigator.userAgent);
+   
    // アプリ環境の場合はアプリ内購入を開始
    if (isAppEnvironment()) {
      if (!userProfile?.uid) {
@@ -171,24 +180,50 @@ export default function SubscriptionPage() {
      
      setIsLoading(true);
      
-     // React Native WebViewにメッセージを送信
+     // デバッグ: どの条件でアプリと判定されたか
      if ((window as any).ReactNativeWebView) {
-       (window as any).ReactNativeWebView.postMessage(
-         JSON.stringify({
-           type: 'openInAppPurchase',
-           action: 'subscribe',
-           productType: 'monthly_with_setup_fee',
-           userId: userProfile.uid,
-           userEmail: userProfile.email
-         })
-       );
+       console.log('Detected: React Native WebView');
        
-       // ローディング状態を3秒後に解除（アプリ側からの応答がない場合のフォールバック）
+       const message = {
+         type: 'openInAppPurchase',
+         action: 'subscribe',
+         productType: 'monthly_with_setup_fee',
+         userId: userProfile.uid,
+         userEmail: userProfile.email
+       };
+       
+       console.log('Sending message:', message);
+       
+       try {
+         (window as any).ReactNativeWebView.postMessage(JSON.stringify(message));
+       } catch (error) {
+         console.error('postMessage error:', error);
+         alert('メッセージ送信エラー: ' + (error as Error).message);
+       }
+       
+       // 5秒後にタイムアウト処理
        setTimeout(() => {
          setIsLoading(false);
-       }, 3000);
+         alert(
+           'アプリ内購入の準備に時間がかかっています。\n\n' +
+           '以下をお試しください：\n' +
+           '• アプリを再起動する\n' +
+           '• インターネット接続を確認する\n' +
+           '• 時間をおいて再度お試しください\n\n' +
+           'または、Web版での登録もご利用いただけます。'
+         );
+       }, 5000);
+     } else if ((window as any).Capacitor) {
+       console.log('Detected: Capacitor');
+       setIsLoading(false);
+       alert('Capacitorアプリでの決済はまだ実装されていません。\nWeb版での登録をご利用ください。');
+     } else if ((window as any).cordova) {
+       console.log('Detected: Cordova');
+       setIsLoading(false);
+       alert('Cordovaアプリでの決済はまだ実装されていません。\nWeb版での登録をご利用ください。');
      } else {
        // フォールバック
+       console.log('Unknown app environment');
        setIsLoading(false);
        alert(
          'アプリ内購入を開始できませんでした。\n\n' +
@@ -285,8 +320,13 @@ export default function SubscriptionPage() {
    if (!isAppEnvironment()) return;
    
    const handleMessage = (event: MessageEvent) => {
+     console.log('Received message event:', event);
+     console.log('Message data:', event.data);
+     
      try {
-       const data = JSON.parse(event.data);
+       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+       console.log('Parsed message data:', data);
+       
        if (data.type === 'purchaseSuccess') {
          setIsLoading(false);
          alert('サブスクリプション登録が完了しました！');
@@ -296,6 +336,8 @@ export default function SubscriptionPage() {
        } else if (data.type === 'purchaseError') {
          setIsLoading(false);
          alert(data.message || '購入処理中にエラーが発生しました');
+       } else if (data.type === 'debug') {
+         console.log('Debug message from app:', data.message);
        }
      } catch (error) {
        console.error('Message handling error:', error);
@@ -727,6 +769,20 @@ export default function SubscriptionPage() {
      cursor: 'pointer',
      color: '#3b82f6',
    },
+   debugPanel: {
+     position: 'fixed' as const,
+     bottom: '200px',
+     right: '20px',
+     backgroundColor: '#1f2937',
+     color: '#f3f4f6',
+     padding: '12px',
+     borderRadius: '8px',
+     fontSize: '11px',
+     fontFamily: 'monospace',
+     maxWidth: '300px',
+     zIndex: 999,
+     lineHeight: 1.5,
+   },
  };
 
  if (authLoading) {
@@ -1096,6 +1152,16 @@ export default function SubscriptionPage() {
              {platform === 'app' ? 'アプリ内購入を準備しています...' : '決済ページへ移動しています...'}
            </span>
          </div>
+       </div>
+     )}
+
+     {/* デバッグパネル（開発環境のみ） */}
+     {process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE === 'true' && platform === 'app' && (
+       <div style={styles.debugPanel}>
+         <div>Platform: {platform}</div>
+         <div>ReactNativeWebView: {typeof (window as any).ReactNativeWebView}</div>
+         <div>Capacitor: {typeof (window as any).Capacitor}</div>
+         <div>Cordova: {typeof (window as any).cordova}</div>
        </div>
      )}
 
