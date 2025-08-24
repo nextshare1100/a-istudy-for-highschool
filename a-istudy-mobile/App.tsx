@@ -55,7 +55,7 @@ export default function App() {
     }
   };
 
-  // 購入処理（修正版 - リロード機能付き）
+  // 購入処理（修正版 - ホーム画面遷移）
   const handlePurchase = async (data: any) => {
     console.log('handlePurchase called with:', data);
     setIsPurchasing(true);
@@ -72,9 +72,9 @@ export default function App() {
         {
           text: 'OK',
           onPress: () => {
-            // WebViewをリロードして最新の状態を反映
+            // シンプルにリロードのみ実行
             if (webViewRef.current) {
-              console.log('Reloading WebView after purchase success');
+              console.log('Reloading WebView after purchase');
               webViewRef.current.reload();
             }
           }
@@ -180,7 +180,7 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://a-istudy-highschool.vercel.app/subscription/register' }}
+        source={{ uri: 'https://a-istudy-highschool.vercel.app' }}
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           setIsLoading(false);
