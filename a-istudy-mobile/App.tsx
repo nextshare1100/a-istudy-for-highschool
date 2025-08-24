@@ -6,14 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 // 開発環境チェック
 const isDevelopment = __DEV__;
 
-// Simulatorチェック（オプション）
-const isSimulator = () => {
-  if (Platform.OS === 'ios') {
-    return !Platform.isPad && !Platform.isTVOS && Platform.Version.includes('Simulator');
-  }
-  return false;
-};
-
 export default function App() {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,31 +132,40 @@ export default function App() {
     }
   };
 
-  // WebViewに初期化完了を通知するJavaScript
-  const injectedJavaScript = `
-    window.ReactNativeWebView = window.ReactNativeWebView || {};
-    window.isNativeApp = true;
-    window.isDevelopment = ${isDevelopment};
+  // WebViewに初期化スクリプトを注入
+  const setupWebView = () => {
+    const script = `
+      (function() {
+        // ReactNativeWebViewが存在しない場合は作成
+        if (!window.ReactNativeWebView) {
+          window.ReactNativeWebView = {
+            postMessage: function(message) {
+              window.webkit.messageHandlers.ReactNativeWebView.postMessage(message);
+            }
+          };
+        }
+        
+        // アプリ環境フラグを設定
+        window.isNativeApp = true;
+        window.isDevelopment = ${isDevelopment};
+        
+        // 設定完了をログ出力
+        console.log('WebView環境設定完了');
+        console.log('ReactNativeWebView:', typeof window.ReactNativeWebView);
+        console.log('isNativeApp:', window.isNativeApp);
+        
+        // 開発環境の場合、追加ログ
+        if (${isDevelopment}) {
+          console.log('🔧 開発環境で実行中 - アプリ内購入はテストモードです');
+        }
+      })();
+      true;
+    `;
     
-    // デバッグ用
-    console.log('WebView環境を設定しました');
-    console.log('ReactNativeWebView:', window.ReactNativeWebView);
-    console.log('isNativeApp:', window.isNativeApp);
-    
-    // アプリの準備完了を通知
-    window.postMessage(JSON.stringify({ 
-      type: 'appReady',
-      isDevelopment: ${isDevelopment},
-      platform: '${Platform.OS}'
-    }));
-    
-    // 開発環境の場合、コンソールにメッセージ
-    if (${isDevelopment}) {
-      console.log('🔧 開発環境で実行中 - アプリ内購入はテストモードです');
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(script);
     }
-    
-    true; // 必須
-  `;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -179,12 +180,13 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://a-istudy-highschool.vercel.app' }}
+        source={{ uri: 'https://a-istudy-highschool.vercel.app/subscription/register' }}
         onMessage={handleWebViewMessage}
-        injectedJavaScript={injectedJavaScript}
         onLoadEnd={() => {
           setIsLoading(false);
           console.log('WebView loaded successfully');
+          // ページ読み込み完了後にスクリプトを注入
+          setTimeout(setupWebView, 500);
         }}
         onLoadStart={() => console.log('WebView loading started')}
         startInLoadingState={true}
