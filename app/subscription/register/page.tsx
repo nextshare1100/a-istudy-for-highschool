@@ -1123,34 +1123,34 @@ export default function SubscriptionPage() {
          </div>
        </div>
        
-       {/* Web版のメリット（アプリ環境の場合） */}
-       {platform === 'app' && (
-         <div style={styles.webPromotionCard}>
-           <div style={styles.webPromotionContent}>
-             <strong>💡 Web版のメリット</strong>
-             <br />
-             • クレジットカード決済で管理が簡単
-             <br />
-             • 領収書の発行が可能
-             <br />
-             • 初回登録料500円で全機能をお試し
-             <br />
-             
-               href="https://a-istudy-highschool.vercel.app/subscription/register"
-               target="_blank"
-               rel="noopener noreferrer"
-               style={{
-                 color: '#92400e',
-                 textDecoration: 'underline',
-                 marginTop: '8px',
-                 display: 'inline-block',
-               }}
-             >
-               Web版で登録する →
-             </a>
-           </div>
-         </div>
-       )}
+      {/* Web版のメリット（アプリ環境の場合） */}
+{platform === 'app' && (
+  <div style={styles.webPromotionCard}>
+    <div style={styles.webPromotionContent}>
+      <strong>💡 Web版のメリット</strong>
+      <br />
+      • クレジットカード決済で管理が簡単
+      <br />
+      • 領収書の発行が可能
+      <br />
+      • 初回登録料500円で全機能をお試し
+      <br />
+      <a 
+        href="https://a-istudy-highschool.vercel.app/subscription/register"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: '#92400e',
+          textDecoration: 'underline',
+          marginTop: '8px',
+          display: 'inline-block',
+        }}
+      >
+        Web版で登録する →
+      </a>
+    </div>
+  </div>
+)}
        
        {/* フッター */}
        <div style={styles.footer}>
