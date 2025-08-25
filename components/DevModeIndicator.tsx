@@ -1,9 +1,13 @@
 'use client'
 
-export function DevModeIndicator() {
-  const isDevelopmentMode = process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE === 'true'
+export default function DevModeIndicator() {
+  console.log('DevModeIndicator rendered')
+  const isDevelopmentMode = true
   
-  if (!isDevelopmentMode) return null
+  if (!isDevelopmentMode) {
+    console.log('DevModeIndicator hidden because isDevelopmentMode is false')
+    return null
+  }
   
   return (
     <div style={{

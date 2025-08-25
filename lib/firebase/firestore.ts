@@ -18,7 +18,8 @@ import {
   increment,
   arrayUnion,
   deleteDoc,
-  writeBatch
+  writeBatch,
+  FieldValue
 } from 'firebase/firestore'
 import { format, startOfMonth, endOfMonth, isValid, parseISO } from 'date-fns'
 import { db } from './config'
@@ -99,6 +100,8 @@ export interface UserProfile {
     cancelAtPeriodEnd?: boolean
     updatedAt: Date
   }
+  // モバイルサブスクリプション関連
+  subscriptionPlatform?: 'ios' | 'android' | 'web'
 }
 
 interface AdditionalUserData {
@@ -238,6 +241,112 @@ export async function updateUserProfile(
     return false
   }
 }
+
+// ========== サブスクリプション関連（新規追加） ==========
+
+/**
+ * ユーザーのサブスクリプション情報を更新する
+ * @param userId - ユーザーID
+ * @param subscriptionData - 更新するサブスクリプション情報
+ */
+export const updateUserSubscription = async (
+  userId: string, 
+  subscriptionData: {
+    status: 'active' | 'inactive' | 'corporate';
+    subscriptionId?: string;
+    platform?: 'ios' | 'android' | 'web';
+  }
+) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    
+    await updateDoc(userRef, {
+      subscriptionStatus: subscriptionData.status,
+      subscriptionId: subscriptionData.subscriptionId,
+      subscriptionPlatform: subscriptionData.platform,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log('User subscription status updated successfully');
+    return true;
+  } catch (error) {
+    console.error('Error updating user subscription:', error);
+    throw error;
+  }
+};
+
+/**
+ * サブスクリプション情報を取得する
+ * @param userId - ユーザーID
+ */
+export const getSubscription = async (userId: string) => {
+  try {
+    const subscriptionRef = doc(db, 'subscriptions', userId);
+    const subscriptionSnap = await getDoc(subscriptionRef);
+    
+    if (subscriptionSnap.exists()) {
+      return {
+        id: subscriptionSnap.id,
+        ...subscriptionSnap.data()
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting subscription:', error);
+    throw error;
+  }
+};
+
+/**
+ * ユーザープロファイルとサブスクリプション情報を同時に更新
+ * @param userId - ユーザーID
+ * @param purchaseData - 購入情報
+ */
+export const updateUserWithSubscription = async (
+  userId: string,
+  purchaseData: {
+    platform: 'ios' | 'android' | 'web';
+    productId: string;
+    transactionId: string;
+  }
+) => {
+  try {
+    // バッチ処理で両方のドキュメントを更新
+    const batch = writeBatch(db);
+    
+    // サブスクリプションドキュメントを作成/更新
+    const subscriptionRef = doc(db, 'subscriptions', userId);
+    batch.set(subscriptionRef, {
+      userId,
+      platform: purchaseData.platform,
+      productId: purchaseData.productId,
+      transactionId: purchaseData.transactionId,
+      status: 'active',
+      type: 'monthly',
+      amount: 980,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDevelopment: process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE === 'true'
+    });
+    
+    // ユーザードキュメントを更新
+    const userRef = doc(db, 'users', userId);
+    batch.update(userRef, {
+      subscriptionStatus: 'active',
+      subscriptionPlatform: purchaseData.platform,
+      updatedAt: serverTimestamp()
+    });
+    
+    await batch.commit();
+    console.log('User and subscription updated successfully');
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating user with subscription:', error);
+    throw error;
+  }
+};
 
 // 学年別ユーザー数の取得（統計用）
 export async function getUserCountByGrade(): Promise<Record<Grade, number>> {
@@ -1770,821 +1879,821 @@ export async function recordBreak(sessionId: string) {
 
 // 学習内容更新
 export async function updateStudyContent(sessionId: string, content: StudyContent) {
-  try {
-    await updateDoc(doc(db, 'timerSessions', sessionId), {
-      content,
-      updatedAt: serverTimestamp()
-    })
-    
-    return { success: true }
-  } catch (error) {
-    console.error('学習内容更新エラー:', error)
-    return { success: false, error }
-  }
+ try {
+   await updateDoc(doc(db, 'timerSessions', sessionId), {
+     content,
+     updatedAt: serverTimestamp()
+   })
+   
+   return { success: true }
+ } catch (error) {
+   console.error('学習内容更新エラー:', error)
+   return { success: false, error }
+ }
 }
 
 // フィードバック送信
 export async function submitStudyFeedback(sessionId: string, feedback: StudyFeedback) {
-  try {
-    await updateDoc(doc(db, 'timerSessions', sessionId), {
-      feedback,
-      updatedAt: serverTimestamp()
-    })
-    
-    return { success: true }
-  } catch (error) {
-    console.error('フィードバック送信エラー:', error)
-    return { success: false, error }
-  }
+ try {
+   await updateDoc(doc(db, 'timerSessions', sessionId), {
+     feedback,
+     updatedAt: serverTimestamp()
+   })
+   
+   return { success: true }
+ } catch (error) {
+   console.error('フィードバック送信エラー:', error)
+   return { success: false, error }
+ }
 }
 
 // ポモドーロセッション完了時の更新
 export async function updatePomodoroSession(
-  sessionId: string, 
-  newState: PomodoroState,
-  sessionsCompleted: number
+ sessionId: string, 
+ newState: PomodoroState,
+ sessionsCompleted: number
 ) {
-  try {
-    await updateDoc(doc(db, 'timerSessions', sessionId), {
-      'timerSettings.pomodoroState': newState,
-      'timerSettings.pomodoroSessions': sessionsCompleted,
-      updatedAt: serverTimestamp()
-    })
-    
-    return { success: true }
-  } catch (error) {
-    console.error('ポモドーロセッション更新エラー:', error)
-    return { success: false, error }
-  }
+ try {
+   await updateDoc(doc(db, 'timerSessions', sessionId), {
+     'timerSettings.pomodoroState': newState,
+     'timerSettings.pomodoroSessions': sessionsCompleted,
+     updatedAt: serverTimestamp()
+   })
+   
+   return { success: true }
+ } catch (error) {
+   console.error('ポモドーロセッション更新エラー:', error)
+   return { success: false, error }
+ }
 }
 
 // アクティブタイマーの監視
 export function subscribeToActiveTimer(callback: (timer: TimerSession | null) => void) {
-  const user = auth.currentUser
-  if (!user) {
-    callback(null)
-    return () => {}
-  }
+ const user = auth.currentUser
+ if (!user) {
+   callback(null)
+   return () => {}
+ }
 
-  const q = query(
-    collection(db, 'timerSessions'),
-    where('userId', '==', user.uid),
-    where('endTime', '==', null),
-    orderBy('startTime', 'desc'),
-    limit(1)
-  )
+ const q = query(
+   collection(db, 'timerSessions'),
+   where('userId', '==', user.uid),
+   where('endTime', '==', null),
+   orderBy('startTime', 'desc'),
+   limit(1)
+ )
 
-  return onSnapshot(q, (snapshot) => {
-    if (snapshot.empty) {
-      callback(null)
-    } else {
-      const doc = snapshot.docs[0]
-      callback({
-        id: doc.id,
-        ...doc.data()
-      } as TimerSession)
-    }
-  })
+ return onSnapshot(q, (snapshot) => {
+   if (snapshot.empty) {
+     callback(null)
+   } else {
+     const doc = snapshot.docs[0]
+     callback({
+       id: doc.id,
+       ...doc.data()
+     } as TimerSession)
+   }
+ })
 }
 
 // 最近のタイマーセッション取得
 export async function getRecentTimerSessions(userId: string, limitCount: number = 10) {
-  try {
-    const q = query(
-      collection(db, 'timerSessions'),
-      where('userId', '==', userId),
-      where('endTime', '!=', null),
-      orderBy('endTime', 'desc'),
-      limit(limitCount)
-    )
-    
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as TimerSession))
-  } catch (error) {
-    console.error('タイマーセッション取得エラー:', error)
-    return []
-  }
+ try {
+   const q = query(
+     collection(db, 'timerSessions'),
+     where('userId', '==', userId),
+     where('endTime', '!=', null),
+     orderBy('endTime', 'desc'),
+     limit(limitCount)
+   )
+   
+   const snapshot = await getDocs(q)
+   return snapshot.docs.map(doc => ({
+     id: doc.id,
+     ...doc.data()
+   } as TimerSession))
+ } catch (error) {
+   console.error('タイマーセッション取得エラー:', error)
+   return []
+ }
 }
 
 // タイマーモード別の統計取得
 export async function getTimerStatisticsByMode(
-  userId: string,
-  mode?: TimerMode
+ userId: string,
+ mode?: TimerMode
 ): Promise<{
-  countup: { sessions: number; totalTime: number; avgTime: number }
-  countdown: { sessions: number; totalTime: number; avgTime: number; completionRate: number }
-  pomodoro: { sessions: number; totalSessions: number; avgSessionsPerStudy: number }
+ countup: { sessions: number; totalTime: number; avgTime: number }
+ countdown: { sessions: number; totalTime: number; avgTime: number; completionRate: number }
+ pomodoro: { sessions: number; totalSessions: number; avgSessionsPerStudy: number }
 }> {
-  try {
-    const constraints = [
-      where('userId', '==', userId),
-      where('endTime', '!=', null)
-    ]
-    
-    if (mode) {
-      constraints.push(where('timerMode', '==', mode))
-    }
-    
-    const q = query(collection(db, 'timerSessions'), ...constraints)
-    const snapshot = await getDocs(q)
-    
-    const stats = {
-      countup: { sessions: 0, totalTime: 0, avgTime: 0 },
-      countdown: { sessions: 0, totalTime: 0, avgTime: 0, completionRate: 0 },
-      pomodoro: { sessions: 0, totalSessions: 0, avgSessionsPerStudy: 0 }
-    }
-    
-    let countdownCompleted = 0
-    
-    snapshot.forEach(doc => {
-      const data = doc.data() as TimerSession
-      const mode = data.timerMode || 'countup'
-      
-      if (mode === 'countup') {
-        stats.countup.sessions++
-        stats.countup.totalTime += data.elapsedSeconds
-      } else if (mode === 'countdown') {
-        stats.countdown.sessions++
-        stats.countdown.totalTime += data.elapsedSeconds
-        
-        // 目標時間に達したかチェック
-        if (data.timerSettings?.targetSeconds && 
-            data.elapsedSeconds >= data.timerSettings.targetSeconds * 0.95) {
-          countdownCompleted++
-        }
-      } else if (mode === 'pomodoro') {
-        stats.pomodoro.sessions++
-        stats.pomodoro.totalSessions += data.timerSettings?.pomodoroSessions || 0
-      }
-    })
-    
-    // 平均値計算
-    if (stats.countup.sessions > 0) {
-      stats.countup.avgTime = Math.round(stats.countup.totalTime / stats.countup.sessions)
-    }
-    
-    if (stats.countdown.sessions > 0) {
-      stats.countdown.avgTime = Math.round(stats.countdown.totalTime / stats.countdown.sessions)
-      stats.countdown.completionRate = Math.round((countdownCompleted / stats.countdown.sessions) * 100)
-    }
-    
-    if (stats.pomodoro.sessions > 0) {
-      stats.pomodoro.avgSessionsPerStudy = Math.round(stats.pomodoro.totalSessions / stats.pomodoro.sessions)
-    }
-    
-    return stats
-  } catch (error) {
-    console.error('Error getting timer statistics by mode:', error)
-    return {
-      countup: { sessions: 0, totalTime: 0, avgTime: 0 },
-      countdown: { sessions: 0, totalTime: 0, avgTime: 0, completionRate: 0 },
-      pomodoro: { sessions: 0, totalSessions: 0, avgSessionsPerStudy: 0 }
-    }
-  }
+ try {
+   const constraints = [
+     where('userId', '==', userId),
+     where('endTime', '!=', null)
+   ]
+   
+   if (mode) {
+     constraints.push(where('timerMode', '==', mode))
+   }
+   
+   const q = query(collection(db, 'timerSessions'), ...constraints)
+   const snapshot = await getDocs(q)
+   
+   const stats = {
+     countup: { sessions: 0, totalTime: 0, avgTime: 0 },
+     countdown: { sessions: 0, totalTime: 0, avgTime: 0, completionRate: 0 },
+     pomodoro: { sessions: 0, totalSessions: 0, avgSessionsPerStudy: 0 }
+   }
+   
+   let countdownCompleted = 0
+   
+   snapshot.forEach(doc => {
+     const data = doc.data() as TimerSession
+     const mode = data.timerMode || 'countup'
+     
+     if (mode === 'countup') {
+       stats.countup.sessions++
+       stats.countup.totalTime += data.elapsedSeconds
+     } else if (mode === 'countdown') {
+       stats.countdown.sessions++
+       stats.countdown.totalTime += data.elapsedSeconds
+       
+       // 目標時間に達したかチェック
+       if (data.timerSettings?.targetSeconds && 
+           data.elapsedSeconds >= data.timerSettings.targetSeconds * 0.95) {
+         countdownCompleted++
+       }
+     } else if (mode === 'pomodoro') {
+       stats.pomodoro.sessions++
+       stats.pomodoro.totalSessions += data.timerSettings?.pomodoroSessions || 0
+     }
+   })
+   
+   // 平均値計算
+   if (stats.countup.sessions > 0) {
+     stats.countup.avgTime = Math.round(stats.countup.totalTime / stats.countup.sessions)
+   }
+   
+   if (stats.countdown.sessions > 0) {
+     stats.countdown.avgTime = Math.round(stats.countdown.totalTime / stats.countdown.sessions)
+     stats.countdown.completionRate = Math.round((countdownCompleted / stats.countdown.sessions) * 100)
+   }
+   
+   if (stats.pomodoro.sessions > 0) {
+     stats.pomodoro.avgSessionsPerStudy = Math.round(stats.pomodoro.totalSessions / stats.pomodoro.sessions)
+   }
+   
+   return stats
+ } catch (error) {
+   console.error('Error getting timer statistics by mode:', error)
+   return {
+     countup: { sessions: 0, totalTime: 0, avgTime: 0 },
+     countdown: { sessions: 0, totalTime: 0, avgTime: 0, completionRate: 0 },
+     pomodoro: { sessions: 0, totalSessions: 0, avgSessionsPerStudy: 0 }
+   }
+ }
 }
 
 // 最適なタイマーモードの提案
 export async function suggestOptimalTimerMode(userId: string): Promise<{
-  recommendedMode: TimerMode
-  reason: string
-  stats: any
+ recommendedMode: TimerMode
+ reason: string
+ stats: any
 }> {
-  try {
-    const stats = await getTimerStatisticsByMode(userId)
-    
-    // 各モードのスコアを計算
-    const scores = {
-      countup: 0,
-      countdown: 0,
-      pomodoro: 0
-    }
-    
-    // カウントアップ: 長時間集中できる場合に適している
-    if (stats.countup.avgTime > 3600) { // 平均1時間以上
-      scores.countup += 3
-    }
-    
-    // カウントダウン: 完了率が高い場合に適している
-    if (stats.countdown.completionRate > 80) {
-      scores.countdown += 3
-    }
-    
-    // ポモドーロ: 複数セッションこなせる場合に適している
-    if (stats.pomodoro.avgSessionsPerStudy >= 4) {
-      scores.pomodoro += 3
-    }
-    
-    // 最もスコアが高いモードを推奨
-    const recommendedMode = Object.entries(scores)
-      .sort(([, a], [, b]) => b - a)[0][0] as TimerMode
-    
-    const reasons = {
-      countup: '長時間集中して学習できるあなたには、カウントアップモードがおすすめです。',
-      countdown: '目標達成率が高いあなたには、カウントダウンモードがおすすめです。',
-      pomodoro: '効率的に休憩を取りながら学習できるあなたには、ポモドーロモードがおすすめです。'
-    }
-    
-    return {
-      recommendedMode,
-      reason: reasons[recommendedMode],
-      stats
-    }
-  } catch (error) {
-    console.error('Error suggesting optimal timer mode:', error)
-    return {
-      recommendedMode: 'countup',
-      reason: 'デフォルトのカウントアップモードから始めてみましょう。',
-      stats: null
-    }
-  }
+ try {
+   const stats = await getTimerStatisticsByMode(userId)
+   
+   // 各モードのスコアを計算
+   const scores = {
+     countup: 0,
+     countdown: 0,
+     pomodoro: 0
+   }
+   
+   // カウントアップ: 長時間集中できる場合に適している
+   if (stats.countup.avgTime > 3600) { // 平均1時間以上
+     scores.countup += 3
+   }
+   
+   // カウントダウン: 完了率が高い場合に適している
+   if (stats.countdown.completionRate > 80) {
+     scores.countdown += 3
+   }
+   
+   // ポモドーロ: 複数セッションこなせる場合に適している
+   if (stats.pomodoro.avgSessionsPerStudy >= 4) {
+     scores.pomodoro += 3
+   }
+   
+   // 最もスコアが高いモードを推奨
+   const recommendedMode = Object.entries(scores)
+     .sort(([, a], [, b]) => b - a)[0][0] as TimerMode
+   
+   const reasons = {
+     countup: '長時間集中して学習できるあなたには、カウントアップモードがおすすめです。',
+     countdown: '目標達成率が高いあなたには、カウントダウンモードがおすすめです。',
+     pomodoro: '効率的に休憩を取りながら学習できるあなたには、ポモドーロモードがおすすめです。'
+   }
+   
+   return {
+     recommendedMode,
+     reason: reasons[recommendedMode],
+     stats
+   }
+ } catch (error) {
+   console.error('Error suggesting optimal timer mode:', error)
+   return {
+     recommendedMode: 'countup',
+     reason: 'デフォルトのカウントアップモードから始めてみましょう。',
+     stats: null
+   }
+ }
 }
 
 // ========== 模試結果関連 ==========
 
 export interface MockExamResult {
-  id?: string
-  examDate: Timestamp
-  examProvider: string
-  examName: string
-  examType: 'comprehensive' | 'subject_specific'
-  totalScore: number
-  totalMaxScore: number
-  deviation: number
-  nationalRank: number
-  totalParticipants: number
-  subjectResults: SubjectResult[]
-  universityAssessments?: UniversityAssessment[]
-  createdAt?: Timestamp
-  updatedAt?: Timestamp
+ id?: string
+ examDate: Timestamp
+ examProvider: string
+ examName: string
+ examType: 'comprehensive' | 'subject_specific'
+ totalScore: number
+ totalMaxScore: number
+ deviation: number
+ nationalRank: number
+ totalParticipants: number
+ subjectResults: SubjectResult[]
+ universityAssessments?: UniversityAssessment[]
+ createdAt?: Timestamp
+ updatedAt?: Timestamp
 }
 
 export interface SubjectResult {
-  subject: string
-  score: number
-  maxScore: number
-  deviation: number
-  rank?: number
+ subject: string
+ score: number
+ maxScore: number
+ deviation: number
+ rank?: number
 }
 
 export interface UniversityAssessment {
-  universityName: string
-  department: string
-  assessment: 'A' | 'B' | 'C' | 'D' | 'E'
-  probability: number
+ universityName: string
+ department: string
+ assessment: 'A' | 'B' | 'C' | 'D' | 'E'
+ probability: number
 }
 
 // 模試結果を保存
 export async function saveMockExamResult(data: Omit<MockExamResult, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const docRef = await addDoc(collection(db, 'users', user.uid, 'mockExamResults'), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    })
-    return docRef.id
-  } catch (error) {
-    console.error('Error saving mock exam result:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const docRef = await addDoc(collection(db, 'users', user.uid, 'mockExamResults'), {
+     ...data,
+     createdAt: serverTimestamp(),
+     updatedAt: serverTimestamp()
+   })
+   return docRef.id
+ } catch (error) {
+   console.error('Error saving mock exam result:', error)
+   throw error
+ }
 }
 
 // 模試結果一覧を取得
 export async function getMockExamResults(): Promise<MockExamResult[]> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const q = query(
-      collection(db, 'users', user.uid, 'mockExamResults'),
-      orderBy('examDate', 'desc')
-    )
-    
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as MockExamResult))
-  } catch (error) {
-    console.error('Error getting mock exam results:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const q = query(
+     collection(db, 'users', user.uid, 'mockExamResults'),
+     orderBy('examDate', 'desc')
+   )
+   
+   const snapshot = await getDocs(q)
+   return snapshot.docs.map(doc => ({
+     id: doc.id,
+     ...doc.data()
+   } as MockExamResult))
+ } catch (error) {
+   console.error('Error getting mock exam results:', error)
+   throw error
+ }
 }
 
 // 期間指定で模試結果を取得
 export async function getMockExamResultsByDateRange(
-  startDate: Date,
-  endDate: Date
+ startDate: Date,
+ endDate: Date
 ): Promise<MockExamResult[]> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const q = query(
-      collection(db, 'users', user.uid, 'mockExamResults'),
-      where('examDate', '>=', Timestamp.fromDate(startDate)),
-      where('examDate', '<=', Timestamp.fromDate(endDate)),
-      orderBy('examDate', 'desc')
-    )
-    
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as MockExamResult))
-  } catch (error) {
-    console.error('Error getting mock exam results by date range:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const q = query(
+     collection(db, 'users', user.uid, 'mockExamResults'),
+     where('examDate', '>=', Timestamp.fromDate(startDate)),
+     where('examDate', '<=', Timestamp.fromDate(endDate)),
+     orderBy('examDate', 'desc')
+   )
+   
+   const snapshot = await getDocs(q)
+   return snapshot.docs.map(doc => ({
+     id: doc.id,
+     ...doc.data()
+   } as MockExamResult))
+ } catch (error) {
+   console.error('Error getting mock exam results by date range:', error)
+   throw error
+ }
 }
 
 // 模試結果を削除
 export async function deleteMockExamResult(resultId: string): Promise<void> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    await deleteDoc(doc(db, 'users', user.uid, 'mockExamResults', resultId))
-  } catch (error) {
-    console.error('Error deleting mock exam result:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   await deleteDoc(doc(db, 'users', user.uid, 'mockExamResults', resultId))
+ } catch (error) {
+   console.error('Error deleting mock exam result:', error)
+   throw error
+ }
 }
 
 // 模試結果を更新
 export async function updateMockExamResult(
-  resultId: string,
-  data: Partial<MockExamResult>
+ resultId: string,
+ data: Partial<MockExamResult>
 ): Promise<void> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    await updateDoc(doc(db, 'users', user.uid, 'mockExamResults', resultId), {
-      ...data,
-      updatedAt: serverTimestamp()
-    })
-  } catch (error) {
-    console.error('Error updating mock exam result:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   await updateDoc(doc(db, 'users', user.uid, 'mockExamResults', resultId), {
+     ...data,
+     updatedAt: serverTimestamp()
+   })
+ } catch (error) {
+   console.error('Error updating mock exam result:', error)
+   throw error
+ }
 }
 
 // 特定の模試結果を取得
 export async function getMockExamResultById(resultId: string): Promise<MockExamResult | null> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const docRef = doc(db, 'users', user.uid, 'mockExamResults', resultId)
-    const docSnap = await getDoc(docRef)
-    
-    if (docSnap.exists()) {
-      return {
-        id: docSnap.id,
-        ...docSnap.data()
-      } as MockExamResult
-    }
-    return null
-  } catch (error) {
-    console.error('Error getting mock exam result:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const docRef = doc(db, 'users', user.uid, 'mockExamResults', resultId)
+   const docSnap = await getDoc(docRef)
+   
+   if (docSnap.exists()) {
+     return {
+       id: docSnap.id,
+       ...docSnap.data()
+     } as MockExamResult
+   }
+   return null
+ } catch (error) {
+   console.error('Error getting mock exam result:', error)
+   throw error
+ }
 }
 
 // 模試目標を保存
 export async function saveMockExamGoals(goals: {
-  deviation: number
-  universityName: string
-  department: string
+ deviation: number
+ universityName: string
+ department: string
 }): Promise<void> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    await setDoc(doc(db, 'users', user.uid, 'settings', 'mockExamGoals'), {
-      ...goals,
-      updatedAt: serverTimestamp()
-    })
-  } catch (error) {
-    console.error('Error saving mock exam goals:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   await setDoc(doc(db, 'users', user.uid, 'settings', 'mockExamGoals'), {
+     ...goals,
+     updatedAt: serverTimestamp()
+   })
+ } catch (error) {
+   console.error('Error saving mock exam goals:', error)
+   throw error
+ }
 }
 
 // 模試目標を取得
 export async function getMockExamGoals(): Promise<{
-  deviation: number
-  universityName: string
-  department: string
+ deviation: number
+ universityName: string
+ department: string
 } | null> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const docRef = doc(db, 'users', user.uid, 'settings', 'mockExamGoals')
-    const docSnap = await getDoc(docRef)
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data()
-      return {
-        deviation: data.deviation,
-        universityName: data.universityName,
-        department: data.department
-      }
-    }
-    return null
-  } catch (error) {
-    console.error('Error getting mock exam goals:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const docRef = doc(db, 'users', user.uid, 'settings', 'mockExamGoals')
+   const docSnap = await getDoc(docRef)
+   
+   if (docSnap.exists()) {
+     const data = docSnap.data()
+     return {
+       deviation: data.deviation,
+       universityName: data.universityName,
+       department: data.department
+     }
+   }
+   return null
+ } catch (error) {
+   console.error('Error getting mock exam goals:', error)
+   throw error
+ }
 }
 
 // 模試結果の統計情報を取得
 export async function getMockExamStatistics(
-  startDate?: Date,
-  endDate?: Date
+ startDate?: Date,
+ endDate?: Date
 ): Promise<{
-  count: number
-  averageDeviation: number
-  maxDeviation: number
-  minDeviation: number
-  subjectStats: { [subject: string]: { average: number; count: number } }
+ count: number
+ averageDeviation: number
+ maxDeviation: number
+ minDeviation: number
+ subjectStats: { [subject: string]: { average: number; count: number } }
 }> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    let q = query(
-      collection(db, 'users', user.uid, 'mockExamResults'),
-      orderBy('examDate', 'desc')
-    )
-    
-    if (startDate && endDate) {
-      q = query(
-        collection(db, 'users', user.uid, 'mockExamResults'),
-        where('examDate', '>=', Timestamp.fromDate(startDate)),
-        where('examDate', '<=', Timestamp.fromDate(endDate)),
-        orderBy('examDate', 'desc')
-      )
-    }
-    
-    const snapshot = await getDocs(q)
-    const results = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as MockExamResult))
-    
-    if (results.length === 0) {
-      return {
-        count: 0,
-        averageDeviation: 0,
-        maxDeviation: 0,
-        minDeviation: 0,
-        subjectStats: {}
-      }
-    }
-    
-    // 統計計算
-    const deviations = results.map(r => r.deviation)
-    const averageDeviation = deviations.reduce((a, b) => a + b, 0) / deviations.length
-    const maxDeviation = Math.max(...deviations)
-    const minDeviation = Math.min(...deviations)
-    
-    // 科目別統計
-    const subjectStats: { [subject: string]: { total: number; count: number } } = {}
-    
-    results.forEach(result => {
-      result.subjectResults.forEach(subject => {
-        if (!subjectStats[subject.subject]) {
-          subjectStats[subject.subject] = { total: 0, count: 0 }
-        }
-        subjectStats[subject.subject].total += subject.deviation
-        subjectStats[subject.subject].count += 1
-      })
-    })
-    
-    const formattedSubjectStats = Object.entries(subjectStats).reduce(
-      (acc, [subject, stats]) => ({
-        ...acc,
-        [subject]: {
-          average: stats.total / stats.count,
-          count: stats.count
-        }
-      }),
-      {}
-    )
-    
-    return {
-      count: results.length,
-      averageDeviation,
-      maxDeviation,
-      minDeviation,
-      subjectStats: formattedSubjectStats
-    }
-  } catch (error) {
-    console.error('Error getting mock exam statistics:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   let q = query(
+     collection(db, 'users', user.uid, 'mockExamResults'),
+     orderBy('examDate', 'desc')
+   )
+   
+   if (startDate && endDate) {
+     q = query(
+       collection(db, 'users', user.uid, 'mockExamResults'),
+       where('examDate', '>=', Timestamp.fromDate(startDate)),
+       where('examDate', '<=', Timestamp.fromDate(endDate)),
+       orderBy('examDate', 'desc')
+     )
+   }
+   
+   const snapshot = await getDocs(q)
+   const results = snapshot.docs.map(doc => ({
+     id: doc.id,
+     ...doc.data()
+   } as MockExamResult))
+   
+   if (results.length === 0) {
+     return {
+       count: 0,
+       averageDeviation: 0,
+       maxDeviation: 0,
+       minDeviation: 0,
+       subjectStats: {}
+     }
+   }
+   
+   // 統計計算
+   const deviations = results.map(r => r.deviation)
+   const averageDeviation = deviations.reduce((a, b) => a + b, 0) / deviations.length
+   const maxDeviation = Math.max(...deviations)
+   const minDeviation = Math.min(...deviations)
+   
+   // 科目別統計
+   const subjectStats: { [subject: string]: { total: number; count: number } } = {}
+   
+   results.forEach(result => {
+     result.subjectResults.forEach(subject => {
+       if (!subjectStats[subject.subject]) {
+         subjectStats[subject.subject] = { total: 0, count: 0 }
+       }
+       subjectStats[subject.subject].total += subject.deviation
+       subjectStats[subject.subject].count += 1
+     })
+   })
+   
+   const formattedSubjectStats = Object.entries(subjectStats).reduce(
+     (acc, [subject, stats]) => ({
+       ...acc,
+       [subject]: {
+         average: stats.total / stats.count,
+         count: stats.count
+       }
+     }),
+     {}
+   )
+   
+   return {
+     count: results.length,
+     averageDeviation,
+     maxDeviation,
+     minDeviation,
+     subjectStats: formattedSubjectStats
+   }
+ } catch (error) {
+   console.error('Error getting mock exam statistics:', error)
+   throw error
+ }
 }
 
 // 成長率分析
 export async function analyzeMockExamGrowth(
-  months: number = 6
+ months: number = 6
 ): Promise<{
-  growthRate: number
-  monthlyProgress: Array<{ month: string; average: number }>
+ growthRate: number
+ monthlyProgress: Array<{ month: string; average: number }>
 }> {
-  const user = auth.currentUser
-  if (!user) throw new Error('User not authenticated')
-  
-  try {
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setMonth(startDate.getMonth() - months)
-    
-    const results = await getMockExamResultsByDateRange(startDate, endDate)
-    
-    if (results.length < 2) {
-      return { growthRate: 0, monthlyProgress: [] }
-    }
-    
-    // 月別に集計
-    const monthlyData: { [key: string]: number[] } = {}
-    
-    results.forEach(result => {
-      const monthKey = format(result.examDate.toDate(), 'yyyy-MM')
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = []
-      }
-      monthlyData[monthKey].push(result.deviation)
-    })
-    
-    // 月別平均を計算
-    const monthlyProgress = Object.entries(monthlyData)
-      .map(([month, deviations]) => ({
-        month,
-        average: deviations.reduce((a, b) => a + b, 0) / deviations.length
-      }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-    
-    // 成長率計算（最初と最後の月を比較）
-    const firstMonthAvg = monthlyProgress[0]?.average || 0
-    const lastMonthAvg = monthlyProgress[monthlyProgress.length - 1]?.average || 0
-    const growthRate = firstMonthAvg > 0 
-      ? ((lastMonthAvg - firstMonthAvg) / firstMonthAvg) * 100 
-      : 0
-    
-    return { growthRate, monthlyProgress }
-  } catch (error) {
-    console.error('Error analyzing mock exam growth:', error)
-    throw error
-  }
+ const user = auth.currentUser
+ if (!user) throw new Error('User not authenticated')
+ 
+ try {
+   const endDate = new Date()
+   const startDate = new Date()
+   startDate.setMonth(startDate.getMonth() - months)
+   
+   const results = await getMockExamResultsByDateRange(startDate, endDate)
+   
+   if (results.length < 2) {
+     return { growthRate: 0, monthlyProgress: [] }
+   }
+   
+   // 月別に集計
+   const monthlyData: { [key: string]: number[] } = {}
+   
+   results.forEach(result => {
+     const monthKey = format(result.examDate.toDate(), 'yyyy-MM')
+     if (!monthlyData[monthKey]) {
+       monthlyData[monthKey] = []
+     }
+     monthlyData[monthKey].push(result.deviation)
+   })
+   
+   // 月別平均を計算
+   const monthlyProgress = Object.entries(monthlyData)
+     .map(([month, deviations]) => ({
+       month,
+       average: deviations.reduce((a, b) => a + b, 0) / deviations.length
+     }))
+     .sort((a, b) => a.month.localeCompare(b.month))
+   
+   // 成長率計算（最初と最後の月を比較）
+   const firstMonthAvg = monthlyProgress[0]?.average || 0
+   const lastMonthAvg = monthlyProgress[monthlyProgress.length - 1]?.average || 0
+   const growthRate = firstMonthAvg > 0 
+     ? ((lastMonthAvg - firstMonthAvg) / firstMonthAvg) * 100 
+     : 0
+   
+   return { growthRate, monthlyProgress }
+ } catch (error) {
+   console.error('Error analyzing mock exam growth:', error)
+   throw error
+ }
 }
 
 // ========== サブスクリプション関連 ==========
 
 // サブスクリプション状態を同期する関数
 export async function syncSubscriptionStatus(
-  userId: string,
-  subscriptionData: {
-    id: string;
-    status: string;
-    currentPeriodEnd?: number;
-    cancelAtPeriodEnd?: boolean;
-    stripePriceId?: string;
-    stripeCustomerId?: string;
-  }
+ userId: string,
+ subscriptionData: {
+   id: string;
+   status: string;
+   currentPeriodEnd?: number;
+   cancelAtPeriodEnd?: boolean;
+   stripePriceId?: string;
+   stripeCustomerId?: string;
+ }
 ) {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      subscriptionStatus: subscriptionData.status === 'active' ? 'premium' : 'free',
-      subscriptionId: subscriptionData.id,
-      subscription: {
-        ...subscriptionData,
-        currentPeriodEnd: subscriptionData.currentPeriodEnd 
-          ? new Date(subscriptionData.currentPeriodEnd * 1000) 
-          : null,
-        updatedAt: new Date()
-      },
-      updatedAt: serverTimestamp()
-    });
-    return true;
-  } catch (error) {
-    console.error('Error syncing subscription status:', error);
-    throw error;
-  }
+ try {
+   const userRef = doc(db, 'users', userId);
+   await updateDoc(userRef, {
+     subscriptionStatus: subscriptionData.status === 'active' ? 'premium' : 'free',
+     subscriptionId: subscriptionData.id,
+     subscription: {
+       ...subscriptionData,
+       currentPeriodEnd: subscriptionData.currentPeriodEnd 
+         ? new Date(subscriptionData.currentPeriodEnd * 1000) 
+         : null,
+       updatedAt: new Date()
+     },
+     updatedAt: serverTimestamp()
+   });
+   return true;
+ } catch (error) {
+   console.error('Error syncing subscription status:', error);
+   throw error;
+ }
 }
 
 // Stripeカスタマー情報を保存
 export async function saveStripeCustomerId(
-  userId: string, 
-  customerId: string
+ userId: string, 
+ customerId: string
 ): Promise<void> {
-  try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      stripeCustomerId: customerId,
-      updatedAt: serverTimestamp()
-    });
-  } catch (error) {
-    console.error('Error saving Stripe customer ID:', error);
-    throw error;
-  }
+ try {
+   const userRef = doc(db, 'users', userId);
+   await updateDoc(userRef, {
+     stripeCustomerId: customerId,
+     updatedAt: serverTimestamp()
+   });
+ } catch (error) {
+   console.error('Error saving Stripe customer ID:', error);
+   throw error;
+ }
 }
 
 // ========== ヘルパー関数 ==========
 
 // フォーカススコア計算（拡張版）
 function calculateFocusScore(
-  elapsedSeconds: number, 
-  breaks: number,
-  pauseCount: number = 0,
-  timerMode: TimerMode = 'countup'
+ elapsedSeconds: number, 
+ breaks: number,
+ pauseCount: number = 0,
+ timerMode: TimerMode = 'countup'
 ): number {
-  const minutes = elapsedSeconds / 60
-  let score = 100
-  
-  // タイマーモードによる調整
-  if (timerMode === 'pomodoro') {
-    // ポモドーロモードは休憩が前提なので減点なし
-    return score
-  }
-  
-  // 休憩回数による減点（適度な休憩は許容）
-  const optimalBreaks = Math.floor(minutes / 60) // 1時間に1回が理想
-  if (breaks > optimalBreaks) {
-    score -= (breaks - optimalBreaks) * 5
-  }
-  
-  // 一時停止回数による減点
-  if (pauseCount > 2) {
-    score -= (pauseCount - 2) * 3
-  }
-  
-  // 短時間すぎる場合の減点（カウントダウンモードは除外）
-  if (timerMode !== 'countdown' && minutes < 15) {
-    score -= 20
-  }
-  
-  return Math.max(0, Math.min(100, Math.round(score)))
+ const minutes = elapsedSeconds / 60
+ let score = 100
+ 
+ // タイマーモードによる調整
+ if (timerMode === 'pomodoro') {
+   // ポモドーロモードは休憩が前提なので減点なし
+   return score
+ }
+ 
+ // 休憩回数による減点（適度な休憩は許容）
+ const optimalBreaks = Math.floor(minutes / 60) // 1時間に1回が理想
+ if (breaks > optimalBreaks) {
+   score -= (breaks - optimalBreaks) * 5
+ }
+ 
+ // 一時停止回数による減点
+ if (pauseCount > 2) {
+   score -= (pauseCount - 2) * 3
+ }
+ 
+ // 短時間すぎる場合の減点（カウントダウンモードは除外）
+ if (timerMode !== 'countdown' && minutes < 15) {
+   score -= 20
+ }
+ 
+ return Math.max(0, Math.min(100, Math.round(score)))
 }
 
 // ユーザーの学習統計更新
 async function updateUserStudyStats(userId: string, seconds: number) {
-  try {
-    const userRef = doc(db, 'users', userId)
-    await updateDoc(userRef, {
-      'studyStats.totalStudyTime': increment(seconds),
-      'studyStats.lastStudyDate': serverTimestamp(),
-      updatedAt: serverTimestamp()
-    })
-  } catch (error) {
-    console.error('学習統計更新エラー:', error)
-  }
+ try {
+   const userRef = doc(db, 'users', userId)
+   await updateDoc(userRef, {
+     'studyStats.totalStudyTime': increment(seconds),
+     'studyStats.lastStudyDate': serverTimestamp(),
+     updatedAt: serverTimestamp()
+   })
+ } catch (error) {
+   console.error('学習統計更新エラー:', error)
+ }
 }
 
 // ストリーク更新
 async function updateUserStreak(userId: string) {
-  try {
-    const userRef = doc(db, 'users', userId)
-    const userDoc = await getDoc(userRef)
-    
-    if (!userDoc.exists()) return
-    
-    const userData = userDoc.data()
-    const lastStudyDate = userData.studyStats?.lastStudyDate?.toDate()
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    let currentStreak = userData.studyStats?.currentStreak || 0
-    
-    if (lastStudyDate) {
-      const lastStudy = new Date(lastStudyDate)
-      lastStudy.setHours(0, 0, 0, 0)
-      
-      const daysDiff = Math.floor((today.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24))
-      
-      if (daysDiff === 0) {
-        // 同じ日
-        return
-      } else if (daysDiff === 1) {
-        // 連続
-        currentStreak += 1
-      } else {
-        // 連続が途切れた
-        currentStreak = 1
-      }
-    } else {
-      currentStreak = 1
-    }
-    
-    const longestStreak = Math.max(currentStreak, userData.studyStats?.longestStreak || 0)
-    
-    await updateDoc(userRef, {
-      'studyStats.currentStreak': currentStreak,
-      'studyStats.longestStreak': longestStreak
-    })
-  } catch (error) {
-    console.error('ストリーク更新エラー:', error)
-  }
+ try {
+   const userRef = doc(db, 'users', userId)
+   const userDoc = await getDoc(userRef)
+   
+   if (!userDoc.exists()) return
+   
+   const userData = userDoc.data()
+   const lastStudyDate = userData.studyStats?.lastStudyDate?.toDate()
+   const today = new Date()
+   today.setHours(0, 0, 0, 0)
+   
+   let currentStreak = userData.studyStats?.currentStreak || 0
+   
+   if (lastStudyDate) {
+     const lastStudy = new Date(lastStudyDate)
+     lastStudy.setHours(0, 0, 0, 0)
+     
+     const daysDiff = Math.floor((today.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24))
+     
+     if (daysDiff === 0) {
+       // 同じ日
+       return
+     } else if (daysDiff === 1) {
+       // 連続
+       currentStreak += 1
+     } else {
+       // 連続が途切れた
+       currentStreak = 1
+     }
+   } else {
+     currentStreak = 1
+   }
+   
+   const longestStreak = Math.max(currentStreak, userData.studyStats?.longestStreak || 0)
+   
+   await updateDoc(userRef, {
+     'studyStats.currentStreak': currentStreak,
+     'studyStats.longestStreak': longestStreak
+   })
+ } catch (error) {
+   console.error('ストリーク更新エラー:', error)
+ }
 }
 
 // ========== 利用規約同意関連 ==========
 
 export interface TermsAgreement {
-  userId: string
-  agreedAt: Timestamp | FieldValue
-  termsVersion: string
-  ip?: string | null
-  userAgent?: string | null
-  isMinor?: boolean
-  parentalConsent?: boolean | null
+ userId: string
+ agreedAt: Timestamp | FieldValue
+ termsVersion: string
+ ip?: string | null
+ userAgent?: string | null
+ isMinor?: boolean
+ parentalConsent?: boolean | null
 }
 
 /**
- * 利用規約への同意を記録
- * @param userId - ユーザーID
- * @param options - 追加オプション（バージョン、未成年フラグなど）
- */
+* 利用規約への同意を記録
+* @param userId - ユーザーID
+* @param options - 追加オプション（バージョン、未成年フラグなど）
+*/
 export async function saveTermsAgreement(
-  userId: string,
-  options?: {
-    termsVersion?: string
-    isMinor?: boolean
-    parentalConsent?: boolean | null
-  }
+ userId: string,
+ options?: {
+   termsVersion?: string
+   isMinor?: boolean
+   parentalConsent?: boolean | null
+ }
 ): Promise<void> {
-  try {
-    const agreementRef = doc(db, 'termsAgreements', userId)
-    
-    const agreementData: TermsAgreement = {
-      userId,
-      agreedAt: serverTimestamp(),
-      termsVersion: options?.termsVersion || '2024.12',
-      ip: null, // 必要に応じてサーバーサイドで取得
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
-      ...(options?.isMinor !== undefined && { isMinor: options.isMinor }),
-      ...(options?.parentalConsent !== undefined && { parentalConsent: options.parentalConsent })
-    }
-    
-    await setDoc(agreementRef, agreementData, { merge: true })
-    
-    console.log('Terms agreement saved successfully for user:', userId)
-  } catch (error) {
-    console.error('Error saving terms agreement:', error)
-    throw error
-  }
+ try {
+   const agreementRef = doc(db, 'termsAgreements', userId)
+   
+   const agreementData: TermsAgreement = {
+     userId,
+     agreedAt: serverTimestamp(),
+     termsVersion: options?.termsVersion || '2024.12',
+     ip: null, // 必要に応じてサーバーサイドで取得
+     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+     ...(options?.isMinor !== undefined && { isMinor: options.isMinor }),
+     ...(options?.parentalConsent !== undefined && { parentalConsent: options.parentalConsent })
+   }
+   
+   await setDoc(agreementRef, agreementData, { merge: true })
+   
+   console.log('Terms agreement saved successfully for user:', userId)
+ } catch (error) {
+   console.error('Error saving terms agreement:', error)
+   throw error
+ }
 }
 
 /**
- * 利用規約同意状況を取得
- * @param userId - ユーザーID
- */
+* 利用規約同意状況を取得
+* @param userId - ユーザーID
+*/
 export async function getTermsAgreement(userId: string): Promise<TermsAgreement | null> {
-  try {
-    const agreementRef = doc(db, 'termsAgreements', userId)
-    const agreementSnap = await getDoc(agreementRef)
-    
-    if (agreementSnap.exists()) {
-      return agreementSnap.data() as TermsAgreement
-    }
-    
-    return null
-  } catch (error) {
-    console.error('Error getting terms agreement:', error)
-    return null
-  }
+ try {
+   const agreementRef = doc(db, 'termsAgreements', userId)
+   const agreementSnap = await getDoc(agreementRef)
+   
+   if (agreementSnap.exists()) {
+     return agreementSnap.data() as TermsAgreement
+   }
+   
+   return null
+ } catch (error) {
+   console.error('Error getting terms agreement:', error)
+   return null
+ }
 }
 
 /**
- * 利用規約同意を更新（新しいバージョンへの同意など）
- * @param userId - ユーザーID
- * @param termsVersion - 新しい利用規約のバージョン
- */
+* 利用規約同意を更新（新しいバージョンへの同意など）
+* @param userId - ユーザーID
+* @param termsVersion - 新しい利用規約のバージョン
+*/
 export async function updateTermsAgreement(
-  userId: string,
-  termsVersion: string
+ userId: string,
+ termsVersion: string
 ): Promise<void> {
-  try {
-    const agreementRef = doc(db, 'termsAgreements', userId)
-    
-    await updateDoc(agreementRef, {
-      agreedAt: serverTimestamp(),
-      termsVersion,
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
-      updatedAt: serverTimestamp()
-    })
-    
-    console.log('Terms agreement updated for user:', userId)
-  } catch (error) {
-    console.error('Error updating terms agreement:', error)
-    throw error
-  }
+ try {
+   const agreementRef = doc(db, 'termsAgreements', userId)
+   
+   await updateDoc(agreementRef, {
+     agreedAt: serverTimestamp(),
+     termsVersion,
+     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+     updatedAt: serverTimestamp()
+   })
+   
+   console.log('Terms agreement updated for user:', userId)
+ } catch (error) {
+   console.error('Error updating terms agreement:', error)
+   throw error
+ }
 }

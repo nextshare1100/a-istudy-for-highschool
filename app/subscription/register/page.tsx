@@ -7,8 +7,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { loadStripe } from '@stripe/stripe-js';
-import { DevModeIndicator } from '@/components/DevModeIndicator';
-import { PaymentTestButtons } from '@/components/PaymentTestButtons';
+// デフォルトインポートに修正
+import DevModeIndicator from '@/components/DevModeIndicator';
+import PaymentTestButtons from '@/components/PaymentTestButtons';
 import { 
  CheckCircle2, 
  Tag, 
@@ -78,6 +79,13 @@ export default function SubscriptionPage() {
  const [showCampaignNotice, setShowCampaignNotice] = useState(false);
  const [isMobile, setIsMobile] = useState(false);
  const [platform, setPlatform] = useState<'web' | 'app'>('web');
+ 
+ // デバッグ: 環境変数の確認
+ useEffect(() => {
+   console.log('=== Dev Mode Debug ===');
+   console.log('NEXT_PUBLIC_PAYMENT_DEV_MODE:', process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE);
+   console.log('Is dev mode enabled:', process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE === 'true');
+ }, []);
  
  // プラットフォーム検出
  useEffect(() => {
@@ -315,38 +323,106 @@ export default function SubscriptionPage() {
    }
  };
  
- // アプリからの決済完了メッセージを受信
+ // WebViewログをネイティブに送信する設定
  useEffect(() => {
-   if (!isAppEnvironment()) return;
-   
-   const handleMessage = (event: MessageEvent) => {
-     console.log('Received message event:', event);
-     console.log('Message data:', event.data);
-     
-     try {
-       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-       console.log('Parsed message data:', data);
-       
-       if (data.type === 'purchaseSuccess') {
-         setIsLoading(false);
-         alert('サブスクリプション登録が完了しました！');
-         setTimeout(() => {
-           router.push('/home');
-         }, 1000);
-       } else if (data.type === 'purchaseError') {
-         setIsLoading(false);
-         alert(data.message || '購入処理中にエラーが発生しました');
-       } else if (data.type === 'debug') {
-         console.log('Debug message from app:', data.message);
+   // WebViewからネイティブアプリにログを送信する関数
+   (window as any).nativeLog = (message: string) => {
+     if ((window as any).ReactNativeWebView) {
+       try {
+         (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+           type: 'console_log',
+           message: message
+         }));
+       } catch (e) {
+         // エラーを無視
        }
-     } catch (error) {
-       console.error('Message handling error:', error);
      }
    };
    
+   // console.logをオーバーライド（開発環境のみ）
+   if (platform === 'app') {
+     const originalLog = console.log;
+     console.log = (...args) => {
+       originalLog.apply(console, args);
+       const message = args.map(arg => 
+         typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+       ).join(' ');
+       (window as any).nativeLog(`[WebView] ${message}`);
+     };
+   }
+ }, [platform]);
+ 
+ // アプリからの決済完了メッセージを受信
+ useEffect(() => {
+   console.log('[WebView] Setting up message listener, platform:', platform);
+   console.log('[WebView] isAppEnvironment:', isAppEnvironment());
+   
+   const handleMessage = (event: MessageEvent) => {
+     console.log('[WebView] Message received from:', event.origin);
+     console.log('[WebView] Message data:', JSON.stringify(event.data));
+     
+     try {
+       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+       console.log('[WebView] Parsed data type:', data.type);
+       
+       if (data.type === 'purchaseSuccess') {
+         console.log('[WebView] Purchase success detected!');
+         console.log('[WebView] Product ID:', data.productId);
+         console.log('[WebView] User ID:', data.userId);
+         console.log('[WebView] Transaction ID:', data.transactionId);
+         
+         setIsLoading(false);
+         alert('サブスクリプション登録が完了しました！');
+         
+         // Firebaseにサブスクリプション情報を保存
+         if (userProfile?.uid && data.productId) {
+           console.log('[WebView] Saving subscription to Firebase...');
+           // TODO: ここでFirebaseへの保存処理を実行
+           // saveSubscriptionToFirebase(userProfile.uid, data);
+         }
+         
+         setTimeout(() => {
+           console.log('[WebView] Navigating to /home');
+           router.push('/home');
+         }, 1000);
+       } else if (data.type === 'purchaseError') {
+         console.log('[WebView] Purchase error:', data.message);
+         setIsLoading(false);
+         alert(data.message || '購入処理中にエラーが発生しました');
+       } else if (data.type === 'debug') {
+         console.log('[WebView] Debug message from app:', data.message);
+       }
+     } catch (error) {
+       console.log('[WebView] Message parsing error:', error);
+     }
+   };
+   
+   // 両方のイベントリスナーを設定
    window.addEventListener('message', handleMessage);
-   return () => window.removeEventListener('message', handleMessage);
- }, [router]);
+   document.addEventListener('message', handleMessage as any);
+   
+   // WebView専用のグローバル関数も設定
+   (window as any).handlePurchaseSuccess = (data: any) => {
+     console.log('[WebView] handlePurchaseSuccess called:', JSON.stringify(data));
+     handleMessage({ data, origin: 'react-native' } as any);
+   };
+   
+   // デバッグ：リスナーが設定されたことを確認
+   console.log('[WebView] Message listeners set up complete');
+   
+   // テスト用：10秒後に状態を確認
+   setTimeout(() => {
+     console.log('[WebView] 10 seconds passed, checking state...');
+     console.log('[WebView] isLoading:', isLoading);
+     console.log('[WebView] platform:', platform);
+   }, 10000);
+   
+   return () => {
+     window.removeEventListener('message', handleMessage);
+     document.removeEventListener('message', handleMessage as any);
+     delete (window as any).handlePurchaseSuccess;
+   };
+ }, [router, platform, userProfile, isLoading]);
 
  // スタイル定義
  const styles = {
@@ -1165,7 +1241,12 @@ export default function SubscriptionPage() {
        </div>
      )}
 
-     {/* 開発モード用コンポーネント */}
+     {/* デバッグ情報 */}
+     <div style={{ position: 'fixed', top: '10px', left: '10px', background: 'purple', color: 'white', padding: '10px', zIndex: 99999 }}>
+       NEXT_PUBLIC_PAYMENT_DEV_MODE = "{process.env.NEXT_PUBLIC_PAYMENT_DEV_MODE}"
+     </div>
+
+     {/* 開発モード用コンポーネント - 無条件表示 */}
      <DevModeIndicator />
      <PaymentTestButtons />
 

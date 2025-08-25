@@ -9,65 +9,40 @@ export const subscriptionService = {
   // 現在のサブスクリプションを取得（全プラットフォーム対応）
   async getCurrentSubscription(userId: string): Promise<UserSubscription | null> {
     try {
-      // まずユーザードキュメントから取得を試みる
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const userData = userDoc.data();
-      
-      if (userData?.subscriptionId) {
-        // サブスクリプションコレクションから詳細を取得
-        const subsDoc = await getDoc(doc(db, 'subscriptions', userData.subscriptionId));
-        if (subsDoc.exists()) {
-          const data = subsDoc.data();
-          return {
-            userId,
-            stripeCustomerId: userData.stripeCustomerId,
-            subscriptionId: userData.subscriptionId,
-            status: data.status || userData.subscriptionStatus || 'free',
-            priceId: data.priceId || data.productId,
-            currentPeriodEnd: data.currentPeriodEnd?.toDate(),
-            cancelAtPeriodEnd: data.cancelAtPeriodEnd || false,
-            trialEndsAt: data.trialEnd?.toDate() || userData.appTrialEndDate?.toDate(),
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-            
-            // プラットフォーム情報
-            platform: userData.platform,
-            
-            // iOS固有の情報
-            iosReceiptData: userData.iosLatestReceipt,
-            iosTransactionId: userData.iosTransactionId,
-            iosOriginalTransactionId: userData.iosOriginalTransactionId,
-            
-            // Android固有の情報
-            androidPurchaseToken: userData.androidSubscriptionToken,
-            androidOrderId: userData.androidRegistrationOrderId,
-            androidProductId: data.productId,
-            
-            // 初回登録料情報
-            registrationFeePaid: userData.registrationFeePaid || false,
-            registrationFeeDate: userData.registrationFeeDate?.toDate(),
-            registrationFeeTransactionId: userData.iosRegistrationTransactionId || userData.androidRegistrationOrderId,
-            
-            // アプリ内クーポン情報
-            appCouponCode: userData.appCouponCode,
-            appCouponAppliedAt: userData.appCouponAppliedAt?.toDate(),
-            appTrialEndDate: userData.appTrialEndDate?.toDate()
-          };
-        }
+      // subscriptionIdはuserIdと同じになるように変更
+      const subsDoc = await getDoc(doc(db, 'subscriptions', userId));
+      if (subsDoc.exists()) {
+        const data = subsDoc.data();
+        return {
+          userId,
+          subscriptionId: userId, // userIdと同じ
+          status: data.status || 'free',
+          platform: data.platform,
+          priceId: data.priceId || data.productId,
+          currentPeriodEnd: data.currentPeriodEnd?.toDate(),
+          currentPeriodStart: data.currentPeriodStart?.toDate(),
+          cancelAtPeriodEnd: data.cancelAtPeriodEnd || false,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          
+          // iOS固有の情報
+          iosReceiptData: data.iosReceiptData,
+          iosTransactionId: data.iosTransactionId,
+          iosOriginalTransactionId: data.iosOriginalTransactionId,
+          
+          // Android固有の情報
+          androidPurchaseToken: data.androidPurchaseToken,
+          androidOrderId: data.androidOrderId,
+          androidProductId: data.productId,
+        };
       }
       
       // サブスクリプションが見つからない場合はフリープランとして返す
       return {
         userId,
-        status: userData?.subscriptionStatus || 'free',
-        platform: userData?.platform,
-        createdAt: userData?.createdAt?.toDate() || new Date(),
-        updatedAt: userData?.updatedAt?.toDate() || new Date(),
-        registrationFeePaid: userData?.registrationFeePaid || false,
-        registrationFeeDate: userData?.registrationFeeDate?.toDate(),
-        appCouponCode: userData?.appCouponCode,
-        appCouponAppliedAt: userData?.appCouponAppliedAt?.toDate(),
-        appTrialEndDate: userData?.appTrialEndDate?.toDate()
+        status: 'free',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
     } catch (error) {
       console.error('Error getting subscription:', error);
@@ -132,12 +107,24 @@ export const subscriptionService = {
         updatedAt: new Date()
       };
       
-      // Firestoreに保存（開発環境では権限エラーを無視）
+      // Firestoreに保存（usersコレクションに保存）
       try {
-        const { setDoc } = await import('firebase/firestore');
-        await setDoc(doc(db, 'subscriptions', user.uid), mockSubscription);
+        const { setDoc, doc } = await import('firebase/firestore');
+        // usersコレクションのユーザードキュメントを更新
+        await setDoc(doc(db, 'users', user.uid), {
+          subscriptionStatus: 'active',
+          subscriptionId: user.uid,
+          platform: 'ios',
+          iosReceiptData: mockSubscription.iosReceiptData,
+          iosTransactionId: mockSubscription.iosTransactionId,
+          productId: mockSubscription.productId,
+          currentPeriodStart: mockSubscription.currentPeriodStart,
+          currentPeriodEnd: mockSubscription.currentPeriodEnd,
+          updatedAt: new Date()
+        }, { merge: true });
+        console.log('Subscription saved to users collection successfully');
       } catch (error) {
-        // 開発環境では権限エラーを無視
+        console.error('Failed to save subscription:', error);
       }
       
       return { success: true, subscription: mockSubscription };
@@ -185,12 +172,24 @@ export const subscriptionService = {
         updatedAt: new Date()
       };
       
-      // Firestoreに保存（開発環境では権限エラーを無視）
+      // Firestoreに保存（usersコレクションに保存）
       try {
-        const { setDoc } = await import('firebase/firestore');
-        await setDoc(doc(db, 'subscriptions', user.uid), mockSubscription);
+        const { setDoc, doc } = await import('firebase/firestore');
+        // usersコレクションのユーザードキュメントを更新
+        await setDoc(doc(db, 'users', user.uid), {
+          subscriptionStatus: 'active',
+          subscriptionId: user.uid,
+          platform: 'android',
+          androidPurchaseToken: mockSubscription.androidPurchaseToken,
+          androidOrderId: mockSubscription.androidOrderId,
+          productId: mockSubscription.productId,
+          currentPeriodStart: mockSubscription.currentPeriodStart,
+          currentPeriodEnd: mockSubscription.currentPeriodEnd,
+          updatedAt: new Date()
+        }, { merge: true });
+        console.log('Subscription saved to users collection successfully');
       } catch (error) {
-        // 開発環境では権限エラーを無視
+        console.error('Failed to save subscription:', error);
       }
       
       return { success: true, subscription: mockSubscription };
@@ -409,12 +408,24 @@ export async function verifyIOSReceipt(
       updatedAt: new Date()
     };
     
-    // Firestoreに保存（開発環境では権限エラーを無視）
+    // Firestoreに保存（usersコレクションに保存）
     try {
-      const { setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'subscriptions', userId), mockSubscription);
+      const { setDoc, doc } = await import('firebase/firestore');
+      // usersコレクションのユーザードキュメントを更新
+      await setDoc(doc(db, 'users', userId), {
+        subscriptionStatus: 'active',
+        subscriptionId: userId,
+        platform: 'ios',
+        iosReceiptData: mockSubscription.iosReceiptData,
+        iosTransactionId: mockSubscription.iosTransactionId,
+        productId: mockSubscription.productId,
+        currentPeriodStart: mockSubscription.currentPeriodStart,
+        currentPeriodEnd: mockSubscription.currentPeriodEnd,
+        updatedAt: new Date()
+      }, { merge: true });
+      console.log('Subscription saved to users collection successfully');
     } catch (error) {
-      // 開発環境では権限エラーを無視
+      console.error('Failed to save subscription:', error);
     }
     
     return { success: true, subscription: mockSubscription };
@@ -463,12 +474,24 @@ export async function verifyAndroidPurchase(
       updatedAt: new Date()
     };
     
-    // Firestoreに保存（開発環境では権限エラーを無視）
+    // Firestoreに保存（usersコレクションに保存）
     try {
-      const { setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'subscriptions', userId), mockSubscription);
+      const { setDoc, doc } = await import('firebase/firestore');
+      // usersコレクションのユーザードキュメントを更新
+      await setDoc(doc(db, 'users', userId), {
+        subscriptionStatus: 'active',
+        subscriptionId: userId,
+        platform: 'android',
+        androidPurchaseToken: mockSubscription.androidPurchaseToken,
+        androidOrderId: mockSubscription.androidOrderId,
+        productId: mockSubscription.productId,
+        currentPeriodStart: mockSubscription.currentPeriodStart,
+        currentPeriodEnd: mockSubscription.currentPeriodEnd,
+        updatedAt: new Date()
+      }, { merge: true });
+      console.log('Subscription saved to users collection successfully');
     } catch (error) {
-      // 開発環境では権限エラーを無視
+      console.error('Failed to save subscription:', error);
     }
     
     return { success: true, subscription: mockSubscription };

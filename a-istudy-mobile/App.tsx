@@ -35,6 +35,10 @@ export default function App() {
       console.log('Message from WebView:', data);
 
       switch (data.type) {
+        case 'console_log':
+          console.log(data.message);
+          break;
+          
         case 'openInAppPurchase':
           await handlePurchase(data);
           break;
@@ -55,7 +59,7 @@ export default function App() {
     }
   };
 
-  // 購入処理（修正版 - ホーム画面遷移）
+  // 購入処理（修正版 - WebViewに成功を通知）
   const handlePurchase = async (data: any) => {
     console.log('handlePurchase called with:', data);
     setIsPurchasing(true);
@@ -64,22 +68,53 @@ export default function App() {
     setTimeout(() => {
       setIsPurchasing(false);
       
+      // 成功データを準備
+      const successData = {
+        type: 'purchaseSuccess',
+        productId: data.productType,
+        userId: data.userId,
+        transactionId: 'test_' + Date.now(),
+        platform: Platform.OS
+      };
+      
+      if (webViewRef.current) {
+        console.log('Sending purchase success to WebView:', successData);
+        
+        // 方法1: postMessage
+        webViewRef.current.postMessage(JSON.stringify(successData));
+        
+        // 方法2: injectJavaScript（より確実）
+        const jsCode = `
+          (function() {
+            const data = ${JSON.stringify(successData)};
+            console.log('[WebView] Receiving purchase success:', data);
+            
+            // 複数の方法でメッセージを送信
+            window.postMessage(data, '*');
+            
+            // グローバル関数が存在する場合は直接呼び出し
+            if (window.handlePurchaseSuccess) {
+              window.handlePurchaseSuccess(data);
+            }
+            
+            // MessageEventを手動で発火
+            const event = new MessageEvent('message', {
+              data: data,
+              origin: 'react-native'
+            });
+            window.dispatchEvent(event);
+          })();
+          true;
+        `;
+        
+        webViewRef.current.injectJavaScript(jsCode);
+      }
+      
       const message = isDevelopment 
         ? 'テスト購入完了\n開発環境のため、実際の課金は発生しません'
         : '購入完了\nサブスクリプションの登録が完了しました';
       
-      Alert.alert('成功', message, [
-        {
-          text: 'OK',
-          onPress: () => {
-            // シンプルにリロードのみ実行
-            if (webViewRef.current) {
-              console.log('Reloading WebView after purchase');
-              webViewRef.current.reload();
-            }
-          }
-        }
-      ]);
+      Alert.alert('成功', message);
     }, 2000);
   };
 
@@ -149,15 +184,47 @@ export default function App() {
         window.isNativeApp = true;
         window.isDevelopment = ${isDevelopment};
         
-        // 設定完了をログ出力
-        console.log('WebView環境設定完了');
-        console.log('ReactNativeWebView:', typeof window.ReactNativeWebView);
-        console.log('isNativeApp:', window.isNativeApp);
+        // ログ転送を設定
+        const originalLog = console.log;
+        console.log = function(...args) {
+          originalLog.apply(console, args);
+          const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+          ).join(' ');
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'console_log',
+              message: '[WebView] ' + message
+            }));
+          } catch(e) {
+            // エラーを無視
+          }
+        };
         
-        // 開発環境の場合、追加ログ
-        if (${isDevelopment}) {
-          console.log('🔧 開発環境で実行中 - アプリ内購入はテストモードです');
-        }
+        // エラーログも転送
+        const originalError = console.error;
+        console.error = function(...args) {
+          originalError.apply(console, args);
+          const message = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+          ).join(' ');
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'console_log',
+              message: '[WebView ERROR] ' + message
+            }));
+          } catch(e) {
+            // エラーを無視
+          }
+        };
+        
+        console.log('WebView setup complete');
+        console.log('Current URL:', window.location.href);
+        console.log('Platform detection:', {
+          ReactNativeWebView: typeof window.ReactNativeWebView,
+          isNativeApp: window.isNativeApp,
+          isDevelopment: window.isDevelopment
+        });
       })();
       true;
     `;
@@ -180,13 +247,13 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://a-istudy-highschool.vercel.app' }}
+        source={{ uri: 'https://d8907f45b85e.ngrok-free.app' }}
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           setIsLoading(false);
           console.log('WebView loaded successfully');
-          // ページ読み込み完了後にスクリプトを注入
-          setTimeout(setupWebView, 500);
+          // ページ読み込み完了後にスクリプトを注入（遅延を増やす）
+          setTimeout(setupWebView, 1000);
         }}
         onLoadStart={() => console.log('WebView loading started')}
         startInLoadingState={true}
