@@ -121,11 +121,10 @@ export async function POST(request: NextRequest) {
    
    console.log('Using price IDs:', { monthlyPriceId, setupFeePriceId });
 
-   // ★★★ ここが重要: 本番URLに固定 ★★★
-   // プレビュー環境でも本番URLにリダイレクトするように修正
+   // 本番URLに固定
    const baseUrl = process.env.NODE_ENV === 'development' 
      ? 'http://localhost:3000' 
-     : 'https://a-istudy-highschool.vercel.app'; // 本番URLに固定
+     : 'https://a-istudy-highschool.vercel.app';
 
    console.log('Using base URL for redirect:', baseUrl);
 
@@ -134,40 +133,6 @@ export async function POST(request: NextRequest) {
      price: monthlyPriceId,
      quantity: 1,
    }];
-
-   // チェックアウトセッションのパラメータ
-   const sessionParams: any = {
-     customer: customerId,
-     payment_method_types: ['card'],
-     line_items: lineItems,
-     mode: 'subscription',
-     success_url: `${baseUrl}/subscription/register?success=true&session_id={CHECKOUT_SESSION_ID}`,
-     cancel_url: `${baseUrl}/subscription/register?canceled=true`,
-     subscription_data: {
-       metadata: {
-         firebaseUserId: userId,
-         environment: process.env.NODE_ENV,
-         createdAt: new Date().toISOString(),
-         source: 'web_checkout',
-       }
-     },
-     locale: 'ja', // 日本語を明示的に指定
-     customer_update: {
-       address: 'auto', // 住所の自動更新を許可
-     },
-     // 自動税金計算（オプション）
-     automatic_tax: {
-       enabled: false
-     },
-     // 請求先住所の収集
-     billing_address_collection: 'required',
-     // 電話番号の収集（オプション）
-     phone_number_collection: {
-       enabled: true
-     },
-     // 通貨を明示的に指定
-     currency: 'jpy',
-   };
 
    // キャンペーンコードの処理
    let isTrialApplied = false;
@@ -178,15 +143,9 @@ export async function POST(request: NextRequest) {
      
      // 特別なキャンペーンコード「AISTUDYTRIAL」の場合
      if (normalizedCode === 'AISTUDYTRIAL') {
-       // 30日間の無料トライアルを設定
-       sessionParams.subscription_data.trial_period_days = 30;
-       sessionParams.subscription_data.metadata.campaignCode = normalizedCode;
        isTrialApplied = true;
        console.log('Applied 30-day trial for AISTUDYTRIAL');
      } else if (normalizedCode === 'AISTUDY2024') {
-       // 旧キャンペーンコードもサポート（互換性のため）
-       sessionParams.subscription_data.trial_period_days = 30;
-       sessionParams.subscription_data.metadata.campaignCode = normalizedCode;
        isTrialApplied = true;
        console.log('Applied 30-day trial for AISTUDY2024');
      } else {
@@ -194,12 +153,6 @@ export async function POST(request: NextRequest) {
        try {
          const coupon = await stripe.coupons.retrieve(normalizedCode);
          console.log('Valid coupon found:', normalizedCode);
-         
-         sessionParams.discounts = [{
-           coupon: normalizedCode
-         }];
-         
-         sessionParams.subscription_data.metadata.campaignCode = normalizedCode;
        } catch (error) {
          console.error('Invalid coupon:', normalizedCode);
          return NextResponse.json(
@@ -219,8 +172,47 @@ export async function POST(request: NextRequest) {
      console.log('Added setup fee to line items');
    }
 
-   // ラインアイテムを更新
-   sessionParams.line_items = lineItems;
+   // チェックアウトセッションのパラメータ（シンプル化）
+   const sessionParams: any = {
+     customer: customerId,
+     payment_method_types: ['card'],
+     line_items: lineItems,
+     mode: 'subscription',
+     success_url: `${baseUrl}/subscription/register?success=true&session_id={CHECKOUT_SESSION_ID}`,
+     cancel_url: `${baseUrl}/subscription/register?canceled=true`,
+     locale: 'ja',
+     currency: 'jpy',
+     billing_address_collection: 'required',
+     phone_number_collection: {
+       enabled: true
+     },
+     allow_promotion_codes: true,
+   };
+
+   // トライアルが適用されている場合
+   if (isTrialApplied && campaignCode) {
+     sessionParams.subscription_data = {
+       trial_period_days: 30,
+       metadata: {
+         firebaseUserId: userId
+       }
+     };
+     
+     // キャンペーンコードがStripeのクーポンの場合
+     if (campaignCode.trim().toUpperCase() !== 'AISTUDYTRIAL' && 
+         campaignCode.trim().toUpperCase() !== 'AISTUDY2024') {
+       sessionParams.discounts = [{
+         coupon: campaignCode.trim().toUpperCase()
+       }];
+     }
+   } else {
+     // トライアルなしの場合
+     sessionParams.subscription_data = {
+       metadata: {
+         firebaseUserId: userId
+       }
+     };
+   }
 
    // チェックアウトセッションを作成
    console.log('Creating checkout session with params:', {
