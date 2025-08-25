@@ -31,19 +31,19 @@ import {
 
 // プラットフォーム検出ユーティリティ
 const getPlatform = () => {
-  if (typeof window === 'undefined') return 'web';
-  
-  // React Native WebView検出
-  if ((window as any).ReactNativeWebView) {
-    return 'app';
-  }
-  
-  // Capacitor/Cordova検出
-  if ((window as any).Capacitor || (window as any).cordova) {
-    return 'app';
-  }
-  
-  return 'web';
+ if (typeof window === 'undefined') return 'web';
+ 
+ // React Native WebView検出
+ if ((window as any).ReactNativeWebView) {
+   return 'app';
+ }
+ 
+ // Capacitor/Cordova検出
+ if ((window as any).Capacitor || (window as any).cordova) {
+   return 'app';
+ }
+ 
+ return 'web';
 };
 
 const isAppEnvironment = () => getPlatform() === 'app';
@@ -51,22 +51,22 @@ const isAppEnvironment = () => getPlatform() === 'app';
 // Stripe設定をファイル内に含める - 修正版
 let stripePromise: Promise<any> | null = null;
 const getStripe = async () => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  if (!stripePromise) {
-    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    console.log('Stripe Publishable Key exists:', !!key);
-    console.log('Key prefix:', key?.substring(0, 7));
-    
-    if (!key) {
-      console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined');
-      throw new Error('Stripe公開キーが設定されていません');
-    }
-    stripePromise = loadStripe(key);
-  }
-  return stripePromise;
+ if (typeof window === 'undefined') {
+   return null;
+ }
+ 
+ if (!stripePromise) {
+   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+   console.log('Stripe Publishable Key exists:', !!key);
+   console.log('Key prefix:', key?.substring(0, 7));
+   
+   if (!key) {
+     console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not defined');
+     throw new Error('Stripe公開キーが設定されていません');
+   }
+   stripePromise = loadStripe(key);
+ }
+ return stripePromise;
 };
 
 export default function SubscriptionPage() {
@@ -168,7 +168,7 @@ export default function SubscriptionPage() {
    }
  }, []);
  
- // 統合決済処理
+ // 統合決済処理 - Payment Link版に変更
  const handleCheckout = async (withCampaignCode: boolean = false) => {
    // デバッグ情報を追加
    console.log('=== Payment Debug Info ===');
@@ -241,7 +241,7 @@ export default function SubscriptionPage() {
      return; // ここで処理を終了（Stripeに進まない）
    }
    
-   // Web版の場合は既存のStripe決済処理
+   // Web版の場合は Payment Link に直接リダイレクト
    if (withCampaignCode && campaignCode.trim() && !showCampaignNotice) {
      setShowCampaignNotice(true);
      return;
@@ -258,67 +258,29 @@ export default function SubscriptionPage() {
    setIsLoading(true);
    
    try {
-     const body: any = {
-       priceType: 'monthly',
-       userId: userProfile.uid,
-     };
+     // Payment Link に直接リダイレクト
+     // ユーザー情報をURLパラメータとして追加
+     const paymentLinkUrl = new URL('https://buy.stripe.com/cNi5kC9rba0FbA63ld9IQ00');
      
-     // キャンペーンコードがある場合は追加
+     // ユーザー情報をパラメータとして追加（オプション）
+     if (userProfile.uid) {
+       paymentLinkUrl.searchParams.append('client_reference_id', userProfile.uid);
+     }
+     if (userProfile.email) {
+       paymentLinkUrl.searchParams.append('prefilled_email', userProfile.email);
+     }
+     
+     // キャンペーンコードがある場合
      if (withCampaignCode && campaignCode.trim()) {
-       body.campaignCode = campaignCode.trim().toUpperCase();
+       paymentLinkUrl.searchParams.append('prefilled_promo_code', campaignCode.trim().toUpperCase());
      }
      
-     // Checkout セッションを作成
-     const response = await fetch('/api/stripe/checkout', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify(body),
-     });
+     // Payment Link へリダイレクト
+     window.location.href = paymentLinkUrl.toString();
      
-     if (!response.ok) {
-       const error = await response.json();
-       throw new Error(error.error || 'チェックアウトセッションの作成に失敗しました');
-     }
-     
-     const { sessionId } = await response.json();
-     
-     if (!sessionId) {
-       throw new Error('セッションIDが取得できませんでした');
-     }
-     
-     // Stripe Checkout にリダイレクト
-     const stripe = await getStripe();
-     if (!stripe) {
-       throw new Error('Stripeの読み込みに失敗しました');
-     }
-     
-     const { error } = await stripe.redirectToCheckout({ sessionId });
-     
-     if (error) {
-       console.error('Stripe redirect error:', error);
-       
-       // エラーハンドリングの改善
-       if (error.message?.includes('blocked') || error.name === 'NetworkError') {
-         alert(
-           '決済ページへのアクセスがブロックされている可能性があります。\n\n' +
-           '以下をお試しください：\n' +
-           '• 広告ブロッカーを一時的に無効化\n' +
-           '• ブラウザの拡張機能を無効化\n' +
-           '• シークレットモード/プライベートブラウジングで再試行'
-         );
-       } else {
-         alert('決済処理中にエラーが発生しました。時間をおいて再度お試しください。');
-       }
-       throw error;
-     }
    } catch (error: any) {
-     console.error('Checkout error details:', {
-       message: error.message,
-       stack: error.stack,
-       type: error.type
-     });
-     alert(error.message || '決済処理中にエラーが発生しました');
-   } finally {
+     console.error('Redirect error:', error);
+     alert('決済ページへの移動中にエラーが発生しました');
      setIsLoading(false);
    }
  };
@@ -1173,7 +1135,7 @@ export default function SubscriptionPage() {
              <br />
              • 初回登録料500円で全機能をお試し
              <br />
-             <a
+             
                href="https://a-istudy-highschool.vercel.app/subscription/register"
                target="_blank"
                rel="noopener noreferrer"
