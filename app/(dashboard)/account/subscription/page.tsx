@@ -1,22 +1,88 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Tag, Sparkles, Loader2 } from 'lucide-react';
+import { CheckCircle2, Tag, Sparkles, Loader2, XCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { toast } from '@/components/ui/use-toast';
 import { getStripe } from "@/lib/stripe/client";
 
 export default function SubscriptionPage() {
   const router = useRouter();
-  const { user, userProfile } = useAuthStore();
+  const searchParams = useSearchParams();
+  const { user, userProfile, refreshUserProfile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [campaignCode, setCampaignCode] = useState('');
+  const [checkingSession, setCheckingSession] = useState(false);
+  
+  // URLパラメータを確認
+  const isSuccess = searchParams.get('success') === 'true';
+  const isCanceled = searchParams.get('canceled') === 'true';
+  const sessionId = searchParams.get('session_id');
+  const isWelcome = searchParams.get('welcome') === 'true';
+  
+  // 成功時のセッション確認と処理
+  useEffect(() => {
+    const checkSessionAndRefresh = async () => {
+      if (isSuccess && sessionId && user) {
+        setCheckingSession(true);
+        try {
+          // セッション情報を確認（オプション：より確実にするため）
+          const response = await fetch('/api/stripe/verify-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, userId: user.uid }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Session verification:', data);
+          }
+          
+          // ユーザープロファイルを再取得（Webhookが処理されるまでの保険）
+          // 少し待ってから再取得（Webhookの処理時間を考慮）
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await refreshUserProfile();
+          
+          // 成功メッセージ
+          toast({
+            title: '✅ 決済が完了しました！',
+            description: 'プレミアムプランへようこそ！すべての機能をご利用いただけます。',
+          });
+          
+          // ダッシュボードへリダイレクト
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 3000);
+          
+        } catch (error) {
+          console.error('Session verification error:', error);
+          // エラーがあってもユーザープロファイルの再取得は試みる
+          await refreshUserProfile();
+        } finally {
+          setCheckingSession(false);
+        }
+      }
+    };
+    
+    checkSessionAndRefresh();
+  }, [isSuccess, sessionId, user, refreshUserProfile, router]);
+  
+  // キャンセル時の処理
+  useEffect(() => {
+    if (isCanceled) {
+      toast({
+        title: '決済がキャンセルされました',
+        description: 'プランの選択からやり直してください。',
+        variant: 'destructive',
+      });
+    }
+  }, [isCanceled]);
   
   const features = [
     'AIによる学習分析と最適化',
@@ -31,7 +97,7 @@ export default function SubscriptionPage() {
   
   const handleCheckout = async (withCampaignCode: boolean = false) => {
     if (!user) {
-      router.push('/login?redirect=/account/subscription');
+      router.push('/login?redirect=/subscription/register');
       return;
     }
     
@@ -86,8 +152,49 @@ export default function SubscriptionPage() {
     }
   };
   
+  // 決済処理中の表示
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="p-8 max-w-md w-full mx-4">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+            <h2 className="text-xl font-semibold">決済を確認しています...</h2>
+            <p className="text-muted-foreground">
+              しばらくお待ちください。自動的にダッシュボードへ移動します。
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  
+  // 決済成功時の表示（確認完了後）
+  if (isSuccess && !checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="p-8 max-w-md w-full mx-4">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold">決済が完了しました！</h2>
+            <p className="text-muted-foreground">
+              プレミアムプランへようこそ！まもなくダッシュボードへ移動します。
+            </p>
+            <div className="pt-4">
+              <Button onClick={() => router.push('/dashboard')}>
+                今すぐダッシュボードへ
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  
   // すでにサブスクリプションがある場合
-  if (userProfile?.subscriptionStatus === 'active') {
+  if (userProfile?.subscriptionStatus === 'active' && !isSuccess) {
     return (
       <div className="container max-w-4xl py-16 px-4">
         <Card className="p-8">
@@ -110,9 +217,21 @@ export default function SubscriptionPage() {
     );
   }
   
+  // 通常のプラン選択画面
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container max-w-5xl py-16 px-4">
+        {/* ウェルカムメッセージ（新規登録時） */}
+        {isWelcome && (
+          <Alert className="mb-8 border-primary/20 bg-primary/5">
+            <Sparkles className="h-4 w-4" />
+            <AlertDescription className="text-base">
+              <strong>アカウント作成ありがとうございます！</strong><br />
+              プレミアムプランに登録して、すべての機能をご利用ください。
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* ヘッダー */}
         <div className="text-center space-y-4 mb-12">
           <Badge className="mb-2" variant="secondary">
