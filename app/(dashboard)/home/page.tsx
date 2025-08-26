@@ -611,47 +611,10 @@ export default function HomePage() {
   return (
     <>
       <style jsx global>{`
-        /* 共通のスタイル変数 */
-        :root {
-          --primary-color: #6366f1;
-          --secondary-color: #8b5cf6;
-          --background-gradient: linear-gradient(to bottom, #f0f9ff, #e0f2fe, #dbeafe);
-          --card-shadow: 0 2px 8px rgba(0,0,0,0.06);
-          --card-hover-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          --transition-base: all 0.2s ease;
-        }
-
-        /* ベーススタイル */
-        body {
-          background: var(--background-gradient);
-          min-height: 100vh;
-        }
-        
-        /* モバイルファーストのベーススタイル */
-        .main-container {
-          width: 100%;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 12px;
-        }
-        
         .main-content {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          padding-bottom: 80px;
-        }
-        
-        .desktop-wrapper {
-          display: contents;
-        }
-        
-        .main-column {
-          display: contents;
-        }
-        
-        .sidebar {
-          display: contents;
+          padding: 12px;
+          max-width: 370px;
+          margin: 0 auto;
         }
         
         .greeting-section {
@@ -675,7 +638,7 @@ export default function HomePage() {
           border-radius: 12px;
           padding: 16px;
           margin-bottom: 16px;
-          box-shadow: var(--card-shadow);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           text-align: center;
         }
         
@@ -683,7 +646,7 @@ export default function HomePage() {
           font-size: 16px;
           font-weight: 600;
           margin-bottom: 6px;
-          color: var(--primary-color);
+          color: #3b82f6;
         }
         
         .welcome-text {
@@ -761,7 +724,7 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           gap: 6px;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .banner-button:hover {
@@ -776,14 +739,8 @@ export default function HomePage() {
         }
         
         /* 本日の学習スケジュール */
-        .section-title {
-          font-size: 14px;
-          font-weight: 600;
-          margin-bottom: 12px;
-        }
-        
         .today-schedule-section {
-          width: 100%;
+          margin-bottom: 16px;
         }
         
         .today-schedule-card {
@@ -847,7 +804,7 @@ export default function HomePage() {
           font-weight: 500;
           color: white;
           text-decoration: none;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           display: flex;
           align-items: center;
           gap: 2px;
@@ -873,7 +830,7 @@ export default function HomePage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .session-item:hover {
@@ -951,7 +908,7 @@ export default function HomePage() {
           border-radius: 12px;
           padding: 16px;
           text-align: center;
-          box-shadow: var(--card-shadow);
+          box-shadow: 0 1px 6px rgba(0,0,0,0.05);
         }
         
         .no-schedule-icon {
@@ -991,7 +948,7 @@ export default function HomePage() {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .create-schedule-button:hover {
@@ -1072,12 +1029,13 @@ export default function HomePage() {
         
         /* チャレンジカードのスタイル */
         .challenges-section {
-          width: 100%;
+          margin-bottom: 16px;
         }
         
         .challenges-grid {
           display: grid;
           gap: 8px;
+          margin-bottom: 16px;
         }
         
         /* デイリーチャレンジカード */
@@ -1210,7 +1168,7 @@ export default function HomePage() {
           font-size: 11px;
           font-weight: 600;
           cursor: pointer;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           width: 100%;
         }
         
@@ -1239,7 +1197,7 @@ export default function HomePage() {
           padding: 4px;
           border-radius: 4px;
           cursor: pointer;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           color: white;
         }
         
@@ -1258,7 +1216,7 @@ export default function HomePage() {
           font-weight: 500;
           cursor: pointer;
           margin-top: 6px;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .manual-generate-button:hover {
@@ -1505,7 +1463,13 @@ export default function HomePage() {
         }
         
         .subjects-overview {
-          width: 100%;
+          margin-bottom: 16px;
+        }
+        
+        .section-title {
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: 12px;
         }
         
         .subject-cards {
@@ -1518,7 +1482,7 @@ export default function HomePage() {
           background: white;
           border-radius: 12px;
           padding: 12px;
-          box-shadow: var(--card-shadow);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           position: relative;
           overflow: hidden;
           transition: transform 0.2s ease;
@@ -1530,7 +1494,7 @@ export default function HomePage() {
         
         .subject-card:hover {
           transform: translateY(-1px);
-          box-shadow: var(--card-hover-shadow);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .subject-card::before {
@@ -1665,8 +1629,8 @@ export default function HomePage() {
           border-radius: 12px;
           padding: 24px;
           text-align: center;
-          box-shadow: var(--card-shadow);
-          width: 100%;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+          margin-bottom: 16px;
         }
         
         .empty-icon {
@@ -1702,7 +1666,7 @@ export default function HomePage() {
         
         .quick-start {
           display: block;
-          width: 100%;
+          margin: 0 auto 16px;
           background: #6c5ce7;
           color: white;
           border: none;
@@ -1716,8 +1680,7 @@ export default function HomePage() {
         
         /* アフィリエイトセクション */
         .affiliate-section {
-          width: 100%;
-          margin-top: 16px;
+          margin: 32px 0 20px;
         }
         
         .affiliate-loading {
@@ -1758,7 +1721,7 @@ export default function HomePage() {
           border-radius: 6px;
           overflow: hidden;
           cursor: pointer;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
           position: relative;
         }
@@ -1859,7 +1822,7 @@ export default function HomePage() {
           font-size: 9px;
           font-weight: 500;
           cursor: pointer;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           justify-content: center;
         }
         
@@ -1882,14 +1845,14 @@ export default function HomePage() {
         
         /* 直近の問題セクション */
         .recent-problems-section {
-          width: 100%;
+          margin: 16px 0;
         }
         
         .recent-problems-card {
           background: white;
           border-radius: 12px;
           padding: 12px;
-          box-shadow: var(--card-shadow);
+          box-shadow: 0 1px 6px rgba(0,0,0,0.05);
         }
         
         .recent-problems-header {
@@ -1927,7 +1890,7 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           gap: 1px;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .view-all-link:hover {
@@ -1947,7 +1910,7 @@ export default function HomePage() {
           border-radius: 6px;
           padding: 8px 8px 6px 8px;
           cursor: pointer;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
           text-decoration: none;
           color: inherit;
           display: block;
@@ -2037,699 +2000,629 @@ export default function HomePage() {
           font-weight: 500;
           cursor: pointer;
           margin-top: 10px;
-          transition: var(--transition-base);
+          transition: all 0.2s ease;
         }
         
         .create-problem-button:hover {
           transform: translateY(-1px);
           box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3);
         }
-        
-        /* デスクトップ版スタイル - 768px以上 */
-        @media (min-width: 768px) {
-          .main-container {
-            padding: 24px;
-          }
-          
-          .main-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 24px;
-            align-items: start;
-            padding-bottom: 0;
-          }
-          
-          .desktop-wrapper {
-            display: contents;
-          }
-          
-          .main-column {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-          }
-          
-          .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            position: sticky;
-            top: 24px;
-          }
-          
-          /* グリーティングセクション */
-          .greeting-section {
-            text-align: left;
-            margin-bottom: 0;
-          }
-          
-          .greeting {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 4px;
-          }
-          
-          .date {
-            font-size: 14px;
-            opacity: 0.7;
-          }
-          
-          /* ウェルカムメッセージ */
-          .welcome-message {
-            padding: 24px;
-            margin-bottom: 0;
-            border-radius: 16px;
-            text-align: left;
-          }
-          
-          .welcome-title {
-            font-size: 20px;
-            margin-bottom: 8px;
-          }
-          
-          .welcome-text {
-            font-size: 14px;
-            line-height: 1.6;
-          }
-          
-          /* 科目設定バナー */
-          .subject-setup-banner {
-            padding: 32px;
-            margin-bottom: 0;
-            border-radius: 20px;
-          }
-          
-          .banner-content {
-            align-items: flex-start;
-            text-align: left;
-          }
-          
-          .banner-icon {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
-          }
-          
-          .banner-title {
-            font-size: 24px;
-            margin-bottom: 12px;
-          }
-          
-          .banner-description {
-            font-size: 14px;
-            margin-bottom: 24px;
-            max-width: 500px;
-            line-height: 1.6;
-          }
-          
-          .banner-button {
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-size: 14px;
-          }
-          
-          .banner-note {
-            font-size: 12px;
-            margin-top: 16px;
-          }
-          
-          /* セクションタイトル */
-          .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-          }
-          
-          /* 学習スケジュール */
-          .today-schedule-card {
-            padding: 20px;
-            border-radius: 16px;
-          }
-          
-          .schedule-header {
-            margin-bottom: 16px;
-          }
-          
-          .schedule-icon {
-            width: 32px;
-            height: 32px;
-          }
-          
-          .schedule-title {
-            font-size: 16px;
-          }
-          
-          .schedule-link {
-            padding: 6px 14px;
-            border-radius: 16px;
-            font-size: 12px;
-          }
-          
-          .schedule-sessions {
-            gap: 10px;
-          }
-          
-          .session-item {
-            padding: 12px;
-            border-radius: 10px;
-          }
-          
-          .session-time {
-            font-size: 11px;
-            margin-bottom: 2px;
-          }
-          
-          .session-subject {
-            font-size: 14px;
-            margin-bottom: 4px;
-          }
-          
-          .session-details {
-            gap: 8px;
-            font-size: 11px;
-          }
-          
-          .session-type-badge {
-            padding: 4px 10px;
-            border-radius: 10px;
-            font-size: 11px;
-          }
-          
-          .schedule-summary {
-            margin-top: 12px;
-            padding-top: 12px;
-          }
-          
-          .summary-value {
-            font-size: 18px;
-          }
-          
-          .summary-label {
-            font-size: 11px;
-          }
-          
-          .no-schedule-card {
-            padding: 24px;
-            border-radius: 16px;
-          }
-          
-          .no-schedule-icon {
-            width: 56px;
-            height: 56px;
-            margin-bottom: 12px;
-          }
-          
-          .no-schedule-title {
-            font-size: 16px;
-            margin-bottom: 8px;
-          }
-          
-          .no-schedule-text {
-            font-size: 12px;
-            margin-bottom: 16px;
-            line-height: 1.5;
-          }
-          
-          .create-schedule-button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-          }
-          
-          /* チャレンジセクション */
-          .daily-challenge-card {
-            padding: 20px;
-            border-radius: 16px;
-          }
-          
-          .challenge-header {
-            margin-bottom: 12px;
-          }
-          
-          .challenge-label {
-            font-size: 11px;
-            margin-bottom: 2px;
-          }
-          
-          .challenge-title {
-            font-size: 18px;
-          }
-          
-          .challenge-time {
-            padding: 4px 10px;
-            border-radius: 16px;
-            font-size: 11px;
-          }
-          
-          .challenge-subject-badge {
-            padding: 6px 12px;
-            border-radius: 16px;
-            margin-bottom: 10px;
-            font-size: 12px;
-          }
-          
-          .challenge-info {
-            gap: 16px;
-            margin-bottom: 16px;
-          }
-          
-          .challenge-info-label {
-            font-size: 11px;
-          }
-          
-          .challenge-info-value {
-            font-size: 14px;
-          }
-          
-          .challenge-button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 13px;
-          }
-          
-          .time-settings-button {
-            top: 16px;
-            right: 16px;
-            padding: 6px;
-            border-radius: 6px;
-          }
-          
-          .manual-generate-button {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            margin-top: 10px;
-          }
-          
-          /* プログレスリング */
-          .progress-ring-container {
-            width: 100%;
-            height: auto;
-            aspect-ratio: 1;
-            max-width: 280px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: var(--card-shadow);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          
-          .progress-ring {
-            width: 100%;
-            height: 100%;
-          }
-          
-          .ring-bg {
-            stroke-width: 20;
-          }
-          
-          .ring-progress {
-            stroke-width: 20;
-          }
-          
-          .total-time {
-            font-size: 48px;
-          }
-          
-          .time-label {
-            font-size: 14px;
-            margin-top: 8px;
-          }
-          
-          .streak-badge {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            margin-top: 16px;
-          }
-          
-          .streak-badge::before {
-            font-size: 16px;
-          }
-          
-          /* 科目カード */
-          .subject-cards {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-          }
-          
-          .subject-card {
-            padding: 16px;
-            border-radius: 16px;
-          }
-          
-          .subject-header {
-            margin-bottom: 12px;
-          }
-          
-          .subject-name {
-            font-size: 12px;
-          }
-          
-          .subject-main-info {
-            margin-bottom: 12px;
-          }
-          
-          .subject-time {
-            font-size: 28px;
-          }
-          
-          .subject-unit {
-            font-size: 12px;
-          }
-          
-          .subject-chart {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 12px;
-          }
-          
-          .chart-center {
-            font-size: 16px;
-          }
-          
-          .subject-stats {
-            padding-top: 12px;
-          }
-          
-          .stat-value {
-            font-size: 14px;
-          }
-          
-          .stat-label {
-            font-size: 10px;
-          }
-          
-          /* 空のスケジュール */
-          .empty-schedule {
-            padding: 32px;
-            border-radius: 16px;
-            margin-bottom: 0;
-          }
-          
-          .empty-icon {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
-          }
-          
-          .empty-title {
-            font-size: 18px;
-            margin-bottom: 8px;
-          }
-          
-          .empty-text {
-            font-size: 14px;
-            margin-bottom: 20px;
-          }
-          
-          .empty-button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 13px;
-          }
-          
-          /* クイックスタートボタン */
-          .quick-start {
-            padding: 16px 32px;
-            border-radius: 16px;
-            font-size: 16px;
-          }
-          
-          /* アフィリエイトセクション */
-          .affiliate-section {
-            margin-top: 0;
-          }
-          
-          .affiliate-loading {
-            padding: 60px 24px;
-            border-radius: 20px;
-          }
-          
-          .loading-spinner {
-            width: 48px;
-            height: 48px;
-            margin-bottom: 16px;
-          }
-          
-          .loading-text {
-            font-size: 14px;
-          }
-          
-          .affiliate-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-          }
-          
-          .sidebar .affiliate-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          
-          .affiliate-card {
-            border-radius: 10px;
-          }
-          
-          .recommendation-badge {
-            top: 6px;
-            left: 6px;
-            right: 6px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-          }
-          
-          .product-image-container {
-            height: 120px;
-            padding: 12px;
-          }
-          
-          .product-info {
-            padding: 12px;
-          }
-          
-          .product-title {
-            font-size: 12px;
-            margin-bottom: 6px;
-          }
-          
-          .product-description {
-            display: block;
-            font-size: 11px;
-            color: #6b7280;
-            line-height: 1.4;
-            margin-bottom: 8px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-          
-          .product-footer {
-            gap: 6px;
-          }
-          
-          .price-symbol {
-            font-size: 11px;
-          }
-          
-          .price-value {
-            font-size: 16px;
-          }
-          
-          .buy-button {
-            padding: 6px 12px;
-            border-radius: 12px;
-            font-size: 11px;
-          }
-          
-          .amazon-logo {
-            height: 10px;
-          }
-          
-          .affiliate-disclaimer {
-            margin-top: 20px;
-            font-size: 11px;
-          }
-          
-          /* 最近の問題 */
-          .recent-problems-card {
-            padding: 20px;
-            border-radius: 16px;
-          }
-          
-          .recent-problems-header {
-            margin-bottom: 16px;
-          }
-          
-          .recent-problems-title {
-            font-size: 18px;
-          }
-          
-          .recent-problems-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-          }
-          
-          .view-all-link {
-            font-size: 12px;
-          }
-          
-          .recent-problems-list {
-            gap: 8px;
-          }
-          
-          .recent-problem-item {
-            padding: 12px;
-            border-radius: 8px;
-          }
-          
-          .problem-meta {
-            gap: 6px;
-            margin-bottom: 6px;
-          }
-          
-          .problem-subject {
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-          }
-          
-          .problem-difficulty {
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-          }
-          
-          .problem-question {
-            font-size: 13px;
-            line-height: 1.4;
-          }
-          
-          .problem-date {
-            font-size: 11px;
-            margin-top: 4px;
-          }
-          
-          .no-problems {
-            padding: 32px;
-          }
-          
-          .create-problem-button {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            margin-top: 16px;
-          }
-          
-          /* 時間設定モーダル */
-          .time-settings-content {
-            max-width: 480px;
-            padding: 32px;
-            border-radius: 16px;
-          }
-          
-          .time-settings-header {
-            margin-bottom: 28px;
-          }
-          
-          .time-settings-title {
-            font-size: 20px;
-          }
-          
-          .time-setting-item {
-            margin-bottom: 28px;
-          }
-          
-          .time-setting-row {
-            margin-bottom: 14px;
-          }
-          
-          .time-setting-label {
-            font-size: 15px;
-            gap: 8px;
-          }
-          
-          .toggle-switch {
-            width: 44px;
-            height: 24px;
-            border-radius: 12px;
-          }
-          
-          .toggle-thumb {
-            top: 3px;
-            left: 3px;
-            width: 18px;
-            height: 18px;
-          }
-          
-          .toggle-switch.active .toggle-thumb {
-            transform: translateX(20px);
-          }
-          
-          .time-input-group {
-            margin-left: 28px;
-          }
-          
-          .time-input-label {
-            font-size: 13px;
-            margin-bottom: 8px;
-          }
-          
-          .time-input {
-            width: 120px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-          }
-          
-          .time-hint {
-            font-size: 12px;
-            margin-top: 6px;
-            line-height: 1.5;
-          }
-          
-          .time-settings-footer {
-            gap: 12px;
-            margin-top: 28px;
-          }
-          
-          .time-settings-cancel,
-          .time-settings-save {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-          }
-          
-          /* 新しいチャレンジ通知 */
-          .new-challenge-notification {
-            top: 24px;
-            padding: 16px 24px;
-            border-radius: 12px;
-            gap: 12px;
-            max-width: 500px;
-          }
-          
-          .notification-icon {
-            width: 24px;
-            height: 24px;
-          }
-          
-          .notification-title {
-            font-size: 14px;
-            margin-bottom: 4px;
-          }
-          
-          .notification-text {
-            font-size: 13px;
-          }
-          
-          .notification-close {
-            padding: 4px;
-            font-size: 14px;
-          }
-        }
       `}</style>
+
+      {/* 新しいチャレンジの通知 */}
+      {showNewChallengeNotification && dailyChallenge && (
+        <div className="new-challenge-notification">
+          <div className="notification-icon">
+            🎯
+          </div>
+          <div className="notification-content">
+            <div className="notification-title">新しいデイリーチャレンジ！</div>
+            <div className="notification-text">
+              {dailyChallenge.subject}の{dailyChallenge.timeSlot === 'morning' ? '朝' : '夜'}のチャレンジが開始されました
+            </div>
+          </div>
+          <button 
+            className="notification-close"
+            onClick={() => setShowNewChallengeNotification(false)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* サブスクリプション成功メッセージ */}
+      {showSuccessMessage && (
+        <div className="fixed top-2 right-2 z-50 max-w-sm animate-in slide-in-from-top-2 duration-300">
+          <Alert className="border-green-200 bg-green-50 shadow-lg text-xs">
+            <CheckCircle2 className="h-3 w-3 text-green-600" />
+            <AlertDescription className="text-green-800 pr-6">
+              <strong>プレミアムプランへようこそ！</strong>
+              <br />
+              アカウント登録とお支払いが正常に完了しました。
+            </AlertDescription>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-1 right-1 h-5 w-5 text-green-600 hover:text-green-800"
+              onClick={() => setShowSuccessMessage(false)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </Alert>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="main-content">
+        <div className="greeting-section">
+          <div className="greeting">
+            {greeting}{userData.displayName && `、${userData.displayName}さん`}
+          </div>
+          <div className="date">{currentDate}</div>
+        </div>
+        
+        {/* Welcome Message for New Users */}
+        {!userData.hasData && (
+          <div className="welcome-message">
+            <div className="welcome-title">ようこそ A-IStudy へ！</div>
+            <div className="welcome-text">
+              まずは学習したい科目を選んで、今日の学習を始めましょう。<br />
+              毎日の学習記録が自動的に保存され、あなたの成長を可視化します。
+            </div>
+          </div>
+        )}
+        
+        {/* 科目未設定時の促進バナー（hasDataがtrueで科目が0の場合のみ表示） */}
+        {userData.subjects.length === 0 && userData.hasData && (
+          <div className="subject-setup-banner">
+            <div className="banner-content">
+              <div className="banner-icon">
+                <BookOpen size={24} color="#2d3436" />
+              </div>
+              <h2 className="banner-title">
+                受験科目を設定しましょう
+              </h2>
+              <p className="banner-description">
+                科目を設定することで、あなた専用の学習プランが作成されます。
+                AIが最適な問題を選んで出題します。
+              </p>
+              <button className="banner-button" onClick={() => router.push('/settings')}>
+                科目を設定する
+                <ArrowRight size={16} />
+              </button>
+              <p className="banner-note">
+                ※ 科目未設定でも全科目からランダムに出題されます
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {/* 本日の学習スケジュール */}
+        {userData.hasData && (
+          <section className="today-schedule-section">
+            <h2 className="section-title">本日の学習スケジュール</h2>
+            
+            {scheduleLoading ? (
+              <div className="today-schedule-card">
+                <div className="schedule-header">
+                  <div className="schedule-title-section">
+                    <div className="schedule-icon">
+                      <Calendar size={16} />
+                    </div>
+                    <div className="schedule-title">読み込み中...</div>
+                  </div>
+                </div>
+              </div>
+            ) : todaySchedule ? (
+              <div className="today-schedule-card">
+                <div className="schedule-header">
+                  <div className="schedule-title-section">
+                    <div className="schedule-icon">
+                      <Calendar size={20} />
+                    </div>
+                    <div className="schedule-title">今日の学習プラン</div>
+                  </div>
+                  <Link href="/schedule" className="schedule-link">
+                    詳細
+                    <ArrowRight size={12} />
+                  </Link>
+                </div>
+                
+                <div className="schedule-sessions">
+                  {todaySchedule.studySessions.slice(0, 3).map((session, index) => (
+                    <div key={index} className="session-item">
+                      <div className="session-info">
+                        <div className="session-time">
+                          {session.startTime} - {session.endTime}
+                        </div>
+                        <div className="session-subject">{session.subject}</div>
+                        <div className="session-details">
+                          <div className="session-detail-item">
+                            <Target size={10} />
+                            {session.unit}
+                          </div>
+                          <div className="session-detail-item">
+                            <Timer size={10} />
+                            {Math.round(timeToMinutes(session.endTime) - timeToMinutes(session.startTime))}分
+                          </div>
+                          {session.targetProblems > 0 && (
+                            <div className="session-detail-item">
+                              📝 {session.targetProblems}問
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="session-type-badge">
+                        {getStudyTypeLabel(session.studyType)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="schedule-summary">
+                  <div className="summary-item">
+                    <span className="summary-value">
+                      {Math.round(todaySchedule.totalStudyMinutes / 60)}h
+                      {todaySchedule.totalStudyMinutes % 60 > 0 && `${todaySchedule.totalStudyMinutes % 60}m`}
+                    </span>
+                    <span className="summary-label">総学習時間</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-value">{todaySchedule.studySessions.length}</span>
+                    <span className="summary-label">セッション</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-value">{todaySchedule.focusSubjects.length}</span>
+                    <span className="summary-label">科目数</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="no-schedule-card">
+                <div className="no-schedule-icon">
+                  <Calendar size={28} color="#9ca3af" />
+                </div>
+                <h3 className="no-schedule-title">学習スケジュールが設定されていません</h3>
+                <p className="no-schedule-text">
+                  AIがあなたの目標と現在の実力から最適な学習プランを作成します。
+                </p>
+                <button 
+                  className="create-schedule-button"
+                  onClick={() => router.push('/schedule')}
+                >
+                  <Target size={16} />
+                  学習プランを作成
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+        
+        {/* Challenges Section - デイリーチャレンジのみ */}
+        <div className="challenges-section">
+          <div className="challenges-grid">
+            {/* Daily Challenge Card - 新規チャレンジ時にアニメーション追加 */}
+            {dailyChallenge && (
+              <div 
+                className={`daily-challenge-card ${hasNewChallenge ? 'new-challenge' : ''}`}
+                style={{ position: 'relative' }}
+              >
+                <button
+                  className="time-settings-button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowTimeSettings(true)
+                  }}
+                >
+                  <Settings size={14} />
+                </button>
+                
+                <div onClick={!dailyChallenge.completed ? startDailyChallenge : undefined}>
+                  <div className="challenge-header">
+                    <div className="challenge-title-section">
+                      <div className="challenge-label">本日のチャレンジ</div>
+                      <div className="challenge-title">デイリーチャレンジ</div>
+                    </div>
+                    <div className="challenge-time">
+                      残り {challengeTimeLeft}
+                    </div>
+                  </div>
+                  <div className="challenge-content">
+                    <div className="challenge-subject-badge">
+                      <span style={{ color: getSubjectColor(dailyChallenge.subject) }}>●</span>
+                      {dailyChallenge.subject}
+                    </div>
+                    <div className="challenge-info">
+                      <div className="challenge-info-item">
+                        <span className="challenge-info-label">問題数</span>
+                        <span className="challenge-info-value">{dailyChallenge.problemCount}問</span>
+                      </div>
+                      <div className="challenge-info-item">
+                        <span className="challenge-info-label">難易度</span>
+                        <span className="challenge-info-value">
+                          {dailyChallenge.difficulty === 'easy' ? '基礎' : 
+                           dailyChallenge.difficulty === 'medium' ? '標準' : '応用'}
+                        </span>
+                      </div>
+                      <div className="challenge-info-item">
+                        <span className="challenge-info-label">報酬</span>
+                        <span className="challenge-info-value">+50 XP</span>
+                      </div>
+                    </div>
+                    <button className={`challenge-button ${dailyChallenge.completed ? 'completed' : ''}`}>
+                      {dailyChallenge.completed ? '✓ 完了済み' : 'チャレンジを開始 →'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* ローディング状態の表示 */}
+            {isChallengeLoading && !dailyChallenge && (
+              <div className="daily-challenge-card" style={{ opacity: 0.6 }}>
+                <div className="challenge-header">
+                  <div className="challenge-title-section">
+                    <div className="challenge-label">本日のチャレンジ</div>
+                    <div className="challenge-title">読み込み中...</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* チャレンジが存在しない場合の表示 */}
+            {!isChallengeLoading && !dailyChallenge && (
+              <div className="daily-challenge-card" style={{ 
+                background: 'linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%)',
+                cursor: 'default' 
+              }}>
+                <div className="challenge-header">
+                  <div className="challenge-title-section">
+                    <div className="challenge-label" style={{ color: '#6b7280' }}>本日のチャレンジ</div>
+                    <div className="challenge-title" style={{ color: '#6b7280' }}>チャレンジがありません</div>
+                  </div>
+                </div>
+                <div className="challenge-content">
+                  <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '12px' }}>
+                    デイリーチャレンジは設定した時間に自動生成されます
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px', flexDirection: 'column' }}>
+                    <button 
+                      className="challenge-button" 
+                      style={{ background: '#3b82f6', color: 'white' }}
+                      onClick={() => setShowTimeSettings(true)}
+                    >
+                      時間設定を開く
+                    </button>
+                    <button 
+                      className="manual-generate-button"
+                      onClick={generateChallengeManually}
+                    >
+                      今すぐチャレンジを生成
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="progress-ring-container" onClick={() => router.push('/timer')} style={{ cursor: 'pointer' }}>
+          <svg className="progress-ring" width="200" height="200">
+            <circle className="ring-bg" cx="100" cy="100" r="90"></circle>
+            <circle 
+              className="ring-progress" 
+              cx="100" 
+              cy="100" 
+              r="90" 
+              style={{ strokeDashoffset: progressOffset }}
+            ></circle>
+          </svg>
+          <div className="ring-content">
+            <div className="total-time">{timeDisplay}</div>
+            <div className="time-label">今日の学習時間</div>
+            <div className={`streak-badge ${userData.currentStreak === 0 ? 'no-streak' : ''}`}>
+              {userData.currentStreak}日連続
+            </div>
+          </div>
+        </div>
+        
+        {/* Empty Schedule for Non-authenticated users */}
+        {!userData.hasData && (
+          <div className="empty-schedule">
+            <div className="empty-icon"></div>
+            <div className="empty-title">学習スケジュールが設定されていません</div>
+            <div className="empty-text">設定画面から受験科目を選んで、学習を始めましょう</div>
+            <button className="empty-button" onClick={() => router.push('/settings')}>科目を設定する</button>
+          </div>
+        )}
+        
+        <button className="quick-start" onClick={() => router.push('/problems/create')}>問題を生成する →</button>
+        
+        {/* 直近の問題セクション */}
+        {userData.hasData && (
+          <section className="recent-problems-section">
+            <div className="recent-problems-card">
+              <div className="recent-problems-header">
+                <div className="recent-problems-title">
+                  <div className="recent-problems-icon">
+                    <Brain size={14} />
+                  </div>
+                  <span>最近作成した問題</span>
+                </div>
+                <Link href="/problems" className="view-all-link">
+                  すべて見る
+                  <ChevronRight size={12} />
+                </Link>
+              </div>
+              
+              {problemsLoading ? (
+                <div style={{ textAlign: 'center', padding: '24px' }}>
+                  <div className="loading-spinner"></div>
+                  <p className="loading-text">読み込み中...</p>
+                </div>
+              ) : recentProblems.length > 0 ? (
+                <div className="recent-problems-list">
+                  {recentProblems.map((problem) => {
+                    const difficultyInfo = getDifficultyInfo(problem.difficulty)
+                    const subjectColor = getSubjectColor(problem.subject)
+                    
+                    return (
+                      <Link
+                        key={problem.id}
+                        href={`/problems/${problem.id}`}
+                        className="recent-problem-item"
+                      >
+                        <div className="problem-content">
+                          <div className="problem-info">
+                            <div className="problem-meta">
+                              <span 
+                                className="problem-subject"
+                                style={{ 
+                                  color: subjectColor,
+                                  borderColor: subjectColor
+                                }}
+                              >
+                                {problem.subject}
+                              </span>
+                              <span 
+                                className="problem-difficulty"
+                                style={{ 
+                                  backgroundColor: difficultyInfo.bg,
+                                  color: difficultyInfo.color
+                                }}
+                              >
+                                {difficultyInfo.label}
+                              </span>
+                            </div>
+                            <p className="problem-question">
+                              {problem.question}
+                            </p>
+                            <p className="problem-date">
+                              {format(problem.createdAt.toDate(), 'M/d HH:mm', { locale: ja })}
+                            </p>
+                          </div>
+                          <ChevronRight size={14} className="problem-arrow" />
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="no-problems">
+                  <Brain size={32} className="no-problems-icon" />
+                  <p style={{ fontSize: '11px' }}>まだ問題を作成していません</p>
+                  <button 
+                    className="create-problem-button"
+                    onClick={() => router.push('/problems/create')}
+                  >
+                    問題を作成する
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+        
+        {/* Amazon アフィリエイト商品セクション */}
+        <section className="affiliate-section">
+          <h2 className="section-title">おすすめ学習アイテム</h2>
+          
+          {affiliateLoading ? (
+            <div className="affiliate-loading">
+              <div className="loading-spinner"></div>
+              <p className="loading-text">あなたに最適な商品を選定中...</p>
+            </div>
+          ) : (
+            <div className="affiliate-grid">
+              {affiliateProducts.slice(0, 4).map((product) => (
+                <div 
+                  key={product.asin} 
+                  className="affiliate-card"
+                  onClick={() => handleProductClick(product, currentUser?.uid || '')}
+                >
+                  {product.recommendationReason && (
+                    <div className="recommendation-badge">
+                      {product.recommendationReason}
+                    </div>
+                  )}
+                  
+                  <div className="product-image-container">
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.title}
+                      className="product-image"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = PLACEHOLDER_SVG;
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="product-info">
+                    <h3 className="product-title">{product.title}</h3>
+                    {product.description && (
+                      <p className="product-description">{product.description}</p>
+                    )}
+                    
+                    <div className="product-footer">
+                      <div className="product-price">
+                        <span className="price-symbol">¥</span>
+                        <span className="price-value">{product.price.toLocaleString()}</span>
+                      </div>
+                      
+                      <button className="buy-button">
+                        <img 
+                          src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" 
+                          alt="Amazon"
+                          className="amazon-logo"
+                        />
+                        <span>で購入</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="affiliate-disclaimer">
+            <p>※ 価格は変動する場合があります。各商品はAmazonアソシエイトリンクです。</p>
+          </div>
+        </section>
+      </main>
+
+      {/* 時間設定モーダル */}
+      {showTimeSettings && (
+        <div className="time-settings-modal" onClick={() => setShowTimeSettings(false)}>
+          <div className="time-settings-content" onClick={(e) => e.stopPropagation()}>
+            <div className="time-settings-header">
+              <h3 className="time-settings-title">
+                <Clock size={16} />
+                デイリーチャレンジ時間設定
+              </h3>
+              <button className="time-settings-close" onClick={() => setShowTimeSettings(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* 朝のチャレンジ設定 */}
+            <div className="time-setting-item">
+              <div className="time-setting-row">
+                <label className="time-setting-label">
+                  <Sun size={16} color="#f59e0b" />
+                  朝のチャレンジ
+                </label>
+                <button
+                  className={`toggle-switch ${scheduleSettings.enableMorning ? 'active' : ''}`}
+                  onClick={() => setScheduleSettings({
+                    ...scheduleSettings,
+                    enableMorning: !scheduleSettings.enableMorning
+                  })}
+                >
+                  <span className="toggle-thumb"></span>
+                </button>
+              </div>
+              
+              {scheduleSettings.enableMorning && (
+                <div className="time-input-group">
+                  <div className="time-input-label">生成時刻</div>
+                  <input
+                    type="time"
+                    value={scheduleSettings.morningTime}
+                    onChange={(e) => setScheduleSettings({
+                      ...scheduleSettings,
+                      morningTime: e.target.value
+                    })}
+                    className="time-input"
+                  />
+                  <div className="time-hint">
+                    朝の通勤・通学時間に合わせて設定しましょう
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 夜のチャレンジ設定 */}
+            <div className="time-setting-item">
+              <div className="time-setting-row">
+                <label className="time-setting-label">
+                  <Moon size={16} color="#3b82f6" />
+                  夜のチャレンジ
+                </label>
+                <button
+                  className={`toggle-switch ${scheduleSettings.enableEvening ? 'active' : ''}`}
+                  onClick={() => setScheduleSettings({
+                    ...scheduleSettings,
+                    enableEvening: !scheduleSettings.enableEvening
+                  })}
+                >
+                  <span className="toggle-thumb"></span>
+                </button>
+              </div>
+              
+              {scheduleSettings.enableEvening && (
+                <div className="time-input-group">
+                  <div className="time-input-label">生成時刻</div>
+                  <input
+                    type="time"
+                    value={scheduleSettings.eveningTime}
+                    onChange={(e) => setScheduleSettings({
+                      ...scheduleSettings,
+                      eveningTime: e.target.value
+                    })}
+                    className="time-input"
+                  />
+                  <div className="time-hint">
+                    帰宅後や就寝前の学習時間に合わせて設定しましょう
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 通知設定 */}
+            <div className="time-setting-item">
+              <div className="time-setting-row">
+                <label className="time-setting-label">
+                  <Bell size={16} color="#6b7280" />
+                  通知を受け取る
+                </label>
+                <button
+                  className={`toggle-switch ${scheduleSettings.notificationsEnabled ? 'active' : ''}`}
+                  onClick={() => setScheduleSettings({
+                    ...scheduleSettings,
+                    notificationsEnabled: !scheduleSettings.notificationsEnabled
+                  })}
+                >
+                  <span className="toggle-thumb"></span>
+                </button>
+              </div>
+              
+              {scheduleSettings.notificationsEnabled && (
+                <div className="time-input-group">
+                  <div className="time-hint">
+                    新しいチャレンジが生成されたときにブラウザ通知でお知らせします
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="time-settings-footer">
+              <button className="time-settings-cancel" onClick={() => setShowTimeSettings(false)}>
+                キャンセル
+              </button>
+              <button 
+                className="time-settings-save" 
+                onClick={handleSaveTimeSettings}
+                disabled={savingSettings || (!scheduleSettings.enableMorning && !scheduleSettings.enableEvening)}
+              >
+                {savingSettings ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

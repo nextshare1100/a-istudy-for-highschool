@@ -1210,6 +1210,345 @@ export default function ProblemGeneratorPage() {
             transform: rotate(360deg);
           }
         }
+        /* ===========================
+   デスクトップ版スタイル
+   既存のモバイルスタイルの後に追加
+   =========================== */
+
+/* タブレット (768px以上) */
+@media (min-width: 768px) {
+  .main-content {
+    padding: 20px;
+    max-width: 720px;
+  }
+  
+  .greeting {
+    font-size: 24px;
+  }
+  
+  .subject-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  .affiliate-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* デスクトップ (1024px以上) */
+@media (min-width: 1024px) {
+  /* 背景グラデーション */
+  body {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
+  }
+  
+  /* メインコンテナを2カラムレイアウトに変更 */
+  .main-content {
+    max-width: 1200px;
+    padding: 32px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+  
+  /* グリーティングを全幅に */
+  .greeting-section {
+    grid-column: 1 / -1;
+    text-align: left;
+    margin-bottom: 32px;
+  }
+  
+  .greeting {
+    font-size: 32px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .date {
+    font-size: 14px;
+  }
+  
+  /* メインカラムの要素 */
+  .welcome-message,
+  .subject-setup-banner,
+  .today-schedule-section,
+  .challenges-section,
+  .empty-schedule,
+  .subjects-overview,
+  .recent-problems-section {
+    grid-column: 1;
+  }
+  
+  /* サイドバー要素 */
+  .progress-ring-container {
+    grid-column: 2;
+    grid-row: 2 / span 4;
+    position: sticky;
+    top: 32px;
+    width: 280px;
+    height: 280px;
+    background: white;
+    border-radius: 50%;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+  
+  .quick-start {
+    grid-column: 2;
+    grid-row: 6;
+    margin: 0;
+    padding: 16px 32px;
+    font-size: 16px;
+  }
+  
+  /* アフィリエイトセクションは全幅 */
+  .affiliate-section {
+    grid-column: 1 / -1;
+    margin-top: 48px;
+  }
+  
+  /* セクションタイトル */
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  
+  /* カードのパディングとシャドウ強化 */
+  .welcome-message,
+  .subject-setup-banner,
+  .today-schedule-card,
+  .no-schedule-card,
+  .daily-challenge-card,
+  .subject-card,
+  .recent-problems-card {
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+  
+  /* バナーのレイアウト調整 */
+  .banner-content {
+    align-items: flex-start;
+    text-align: left;
+    max-width: none;
+  }
+  
+  .banner-icon {
+    width: 64px;
+    height: 64px;
+  }
+  
+  .banner-title {
+    font-size: 24px;
+  }
+  
+  .banner-description {
+    font-size: 16px;
+    max-width: 600px;
+  }
+  
+  .banner-button {
+    padding: 14px 28px;
+    font-size: 14px;
+  }
+  
+  /* スケジュールセッション2列 */
+  .today-schedule-card {
+    padding: 28px;
+  }
+  
+  .schedule-sessions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .schedule-title {
+    font-size: 16px;
+  }
+  
+  .session-subject {
+    font-size: 14px;
+  }
+  
+  /* チャレンジカード調整 */
+  .daily-challenge-card {
+    padding: 28px;
+  }
+  
+  .challenge-title {
+    font-size: 18px;
+  }
+  
+  .challenge-label {
+    font-size: 11px;
+  }
+  
+  .challenge-info-value {
+    font-size: 14px;
+  }
+  
+  .challenge-button {
+    padding: 12px 24px;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+  
+  /* 科目カード4列 */
+  .subject-cards {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  
+  .subject-card {
+    padding: 20px;
+  }
+  
+  .subject-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  
+  .subject-name {
+    font-size: 13px;
+  }
+  
+  .subject-chart {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .subject-time {
+    font-size: 32px;
+  }
+  
+  .stat-value {
+    font-size: 14px;
+  }
+  
+  /* 最近の問題カード */
+  .recent-problems-card {
+    padding: 24px;
+  }
+  
+  .recent-problems-title {
+    font-size: 18px;
+  }
+  
+  .recent-problem-item {
+    padding: 12px 16px;
+  }
+  
+  .recent-problem-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  
+  .problem-question {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* 進捗リング拡大 */
+  .ring-bg,
+  .ring-progress {
+    stroke-width: 24;
+  }
+  
+  .total-time {
+    font-size: 48px;
+  }
+  
+  .time-label {
+    font-size: 14px;
+  }
+  
+  .streak-badge {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  
+  /* アフィリエイトカード */
+  .affiliate-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+  
+  .affiliate-card {
+    border-radius: 12px;
+  }
+  
+  .affiliate-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  }
+  
+  .product-image-container {
+    height: 140px;
+    padding: 16px;
+  }
+  
+  .product-info {
+    padding: 16px;
+  }
+  
+  .product-title {
+    font-size: 13px;
+  }
+  
+  .price-value {
+    font-size: 18px;
+  }
+  
+  .buy-button {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+  
+  /* モーダル調整 */
+  .time-settings-modal {
+    backdrop-filter: blur(8px);
+  }
+  
+  .time-settings-content {
+    max-width: 480px;
+    padding: 32px;
+    border-radius: 16px;
+  }
+  
+  .time-settings-title {
+    font-size: 20px;
+  }
+  
+  .time-setting-label {
+    font-size: 16px;
+  }
+}
+
+/* 大画面 (1440px以上) */
+@media (min-width: 1440px) {
+  .main-content {
+    max-width: 1400px;
+    grid-template-columns: 1fr 360px;
+    gap: 32px;
+  }
+  
+  .subject-cards {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  
+  .progress-ring-container {
+    width: 320px;
+    height: 320px;
+  }
+  
+  .total-time {
+    font-size: 56px;
+  }
+}
       `}</style>
 
       <div className="generator-content">
