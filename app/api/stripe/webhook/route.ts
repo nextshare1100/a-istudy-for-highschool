@@ -79,16 +79,36 @@ export async function POST(req: NextRequest) {
           const session = event.data.object as Stripe.Checkout.Session;
           console.log('Checkout completed:', session.id);
           
+          // デバッグ：セッションの内容を詳細にログ出力
+          console.log('Session metadata:', JSON.stringify(session.metadata));
+          console.log('Session subscription ID:', session.subscription);
+          console.log('Session customer ID:', session.customer);
+          
           // セッションの詳細情報を取得（subscription を含む）
           const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
             expand: ['subscription', 'customer', 'line_items']
           });
           
+          console.log('Full session metadata:', JSON.stringify(fullSession.metadata));
+          
+          // サブスクリプション情報の詳細ログ
+          if (fullSession.subscription) {
+            console.log('Subscription object type:', typeof fullSession.subscription);
+            console.log('Subscription ID:', (fullSession.subscription as any).id);
+            console.log('Subscription metadata:', JSON.stringify((fullSession.subscription as any).metadata));
+          }
+          
           const firebaseUserId = fullSession.metadata?.firebaseUserId || 
-                                fullSession.subscription?.metadata?.firebaseUserId;
+                                (fullSession.subscription as any)?.metadata?.firebaseUserId;
+          
+          console.log('Extracted Firebase user ID:', firebaseUserId);
           
           if (!firebaseUserId) {
             console.error('No Firebase user ID found in session metadata');
+            console.error('Available metadata:', {
+              sessionMetadata: fullSession.metadata,
+              subscriptionMetadata: (fullSession.subscription as any)?.metadata
+            });
             break;
           }
           
@@ -100,8 +120,12 @@ export async function POST(req: NextRequest) {
             break;
           }
           
+          console.log('Processing subscription:', subscription.id);
+          console.log('Subscription status:', subscription.status);
+          
           // カスタマー情報
           const customer = fullSession.customer as Stripe.Customer;
+          console.log('Customer email:', customer?.email);
           
           // サブスクリプションデータを準備
           const subscriptionData = {
@@ -132,11 +156,16 @@ export async function POST(req: NextRequest) {
             customerEmail: customer?.email || null,
           };
           
+          console.log('Subscription data to save:', JSON.stringify(subscriptionData));
+          
           // Firestoreにサブスクリプション情報を保存
+          console.log('Saving to Firestore...');
           await adminFirestore
             .collection('subscriptions')
             .doc(subscription.id)
             .set(subscriptionData, { merge: true });
+          
+          console.log('Subscription saved to Firestore');
           
           // ユーザードキュメントを更新
           const userUpdateData: any = {
@@ -152,10 +181,13 @@ export async function POST(req: NextRequest) {
             userUpdateData.aistudyTrialUsedAt = new Date();
           }
           
+          console.log('Updating user document...');
           await adminFirestore
             .collection('users')
             .doc(firebaseUserId)
             .update(userUpdateData);
+          
+          console.log('User document updated');
           
           // AISTUDYTRIAL使用履歴を記録（重複使用防止用）
           if (fullSession.metadata?.campaignCode === 'AISTUDYTRIAL') {
@@ -189,7 +221,7 @@ export async function POST(req: NextRequest) {
               metadata: fullSession.metadata || {},
             });
           
-          console.log(`Subscription ${subscription.id} created for user ${firebaseUserId}`);
+          console.log(`Subscription ${subscription.id} created for user ${firebaseUserId} - COMPLETE`);
           break;
         }
         
