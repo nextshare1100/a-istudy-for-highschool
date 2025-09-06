@@ -20,9 +20,6 @@ export interface UserProfile {
   subjects: Subject[];
   goals: StudyGoal[];
   aspirations: Aspiration[];
-  subscriptionStatus: 'free' | 'active' | 'cancelled' | 'past_due';
-  subscriptionId?: string;
-  stripeCustomerId?: string;
   createdAt: Timestamp | any;
   updatedAt: Timestamp | any;
   lastActiveAt: Timestamp | any;
@@ -354,4 +351,14 @@ export interface AnswerSubmission {
   timeSpent: number;
   hintsUsed: number;
   confidence: number;
+}
+
+// ScheduleTask（auth-storeで使用）
+export interface ScheduleTask {
+  id: string;
+  title: string;
+  subject: string;
+  startTime: string;
+  endTime: string;
+  completed: boolean;
 }

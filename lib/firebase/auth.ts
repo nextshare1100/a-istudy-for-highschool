@@ -52,7 +52,6 @@ export async function signUp(
      subjects: [],
      goals: [],
      aspirations: [],
-     subscriptionStatus: 'inactive', // 新仕様: デフォルトは未加入
      createdAt: serverTimestamp(),
      updatedAt: serverTimestamp(),
      lastActiveAt: serverTimestamp(),
@@ -105,7 +104,6 @@ export async function signInWithGoogle(): Promise<{ user: User; profile: UserPro
        subjects: [],
        goals: [],
        aspirations: [],
-       subscriptionStatus: 'inactive', // 新仕様: デフォルトは未加入
        createdAt: serverTimestamp(),
        updatedAt: serverTimestamp(),
        lastActiveAt: serverTimestamp(),
@@ -145,7 +143,6 @@ export async function signInWithApple(): Promise<{ user: User; profile: UserProf
        subjects: [],
        goals: [],
        aspirations: [],
-       subscriptionStatus: 'inactive', // 新仕様: デフォルトは未加入
        createdAt: serverTimestamp(),
        updatedAt: serverTimestamp(),
        lastActiveAt: serverTimestamp(),
@@ -211,25 +208,6 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
  } catch (error) {
    console.error('Failed to get user profile:', error);
    return null;
- }
-}
-
-// サブスクリプション状態を更新
-export async function updateSubscriptionStatus(
- userId: string, 
- status: 'active' | 'inactive' | 'trial'
-): Promise<void> {
- try {
-   await updateDoc(
-     doc(db, 'users', userId),
-     { 
-       subscriptionStatus: status,
-       updatedAt: serverTimestamp()
-     }
-   );
- } catch (error) {
-   console.error('Failed to update subscription status:', error);
-   throw error;
  }
 }
 

@@ -1,3 +1,5 @@
+//store/auth-store.ts
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { User } from 'firebase/auth'
@@ -27,10 +29,6 @@ interface AuthState {
   todaysTasks: ScheduleTask[]
   upcomingDeadlines: Deadline[]
   
-  // チャット5のサブスクリプション状態
-  subscriptionStatus: 'free' | 'active' | 'cancelled' | 'past_due'
-  subscriptionEndDate: Date | null
-  
   // アクション
   initialize: () => Promise<void>
   setUser: (user: User | null) => void
@@ -54,8 +52,6 @@ export const useAuthStore = create<AuthState>()(
       totalStudyTime: 0,
       todaysTasks: [],
       upcomingDeadlines: [],
-      subscriptionStatus: 'free',
-      subscriptionEndDate: null,
 
       // 初期化
       initialize: async () => {
@@ -121,21 +117,6 @@ export const useAuthStore = create<AuthState>()(
             set({ todaysTasks: scheduleData.tasks || [] })
           }
 
-          // サブスクリプション状態を取得
-          // TODO: Firestoreまたは専用APIから取得
-          const subscriptionResponse = await fetch('/api/subscription/status', {
-            headers: {
-              'Authorization': `Bearer ${await user.getIdToken()}`
-            }
-          })
-          
-          if (subscriptionResponse.ok) {
-            const subscriptionData = await subscriptionResponse.json()
-            set({
-              subscriptionStatus: subscriptionData.status || 'free',
-              subscriptionEndDate: subscriptionData.endDate ? new Date(subscriptionData.endDate) : null
-            })
-          }
         } catch (error) {
           console.error('統合データの取得に失敗:', error)
         }
@@ -155,8 +136,6 @@ export const useAuthStore = create<AuthState>()(
             totalStudyTime: 0,
             todaysTasks: [],
             upcomingDeadlines: [],
-            subscriptionStatus: 'free',
-            subscriptionEndDate: null,
             loading: false,
             error: null
           })
@@ -173,8 +152,6 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         // 永続化する項目を選択
         userProfile: state.userProfile,
-        subscriptionStatus: state.subscriptionStatus,
-        subscriptionEndDate: state.subscriptionEndDate
       })
     }
   )

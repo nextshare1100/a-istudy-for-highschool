@@ -82,9 +82,6 @@ export const PROBLEM_TYPES = {
   SEQUENCE_SORT: { id: 'sequence_sort', name: '解法並び替え' },
 } as const;
 
-export const SUBSCRIPTION_PRICE = 980; // 円
-export const FREE_TRIAL_DAYS = 7;
-
 export const TIMER_PRESETS = {
   POMODORO: {
     work: 25 * 60, // 25分（秒）

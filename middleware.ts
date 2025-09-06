@@ -1,4 +1,3 @@
-// middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkRateLimit, setRateLimitHeaders, createRateLimitResponse, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
@@ -6,22 +5,24 @@ import { checkRateLimit, setRateLimitHeaders, createRateLimitResponse, RATE_LIMI
 // 本番環境のベースURL
 const PRODUCTION_URL = 'https://a-istudy-highschool.vercel.app';
 
-// 保護されたパス（サブスクリプションが必要）
+// 保護されたパス（認証が必要）
 const protectedPaths = [
   '/dashboard',
   '/study',
   '/analysis',
   '/settings',
-  // 他の保護されたパスを追加
+  '/home',
+  '/problems',
+  '/timer',
+  '/schedule',
 ];
 
 // 認証不要のパス
 const publicPaths = [
   '/login',
   '/register',
-  '/subscription/plans',
-  '/api/subscription',
-  '/api/stripe',
+  '/terms',
+  '/privacy',
 ];
 
 // レート制限を適用するAPIパス
@@ -37,6 +38,11 @@ export async function middleware(request: NextRequest) {
     path.includes('/favicon.ico')
   ) {
     return NextResponse.next();
+  }
+
+  // 削除されたパスへのリダイレクト
+  if (path.startsWith('/subscription') || path.startsWith('/payment')) {
+    return NextResponse.redirect(new URL('/home', request.url));
   }
 
   // APIルートのレート制限チェック
@@ -89,13 +95,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 保護されたページへのアクセスチェック（既存のロジック）
+  // 保護されたページへのアクセスチェック（認証のみ）
   if (protectedPaths.some(protectedPath => path.startsWith(protectedPath))) {
-    // Note: 実際のサブスクリプションチェックは
-    // クライアントサイドまたはサーバーコンポーネントで行う
-    // middleware内では認証トークンの確認のみ
-    
-    // 例: Cookieから認証トークンを確認
+    // 認証トークンの確認のみ
     const token = request.cookies.get('auth-token');
     if (!token) {
       // 開発環境では通常のリダイレクト、本番環境では本番URLへリダイレクト
@@ -120,6 +122,10 @@ export const config = {
     '/study/:path*',
     '/analysis/:path*',
     '/settings/:path*',
+    '/home/:path*',
+    '/problems/:path*',
+    '/timer/:path*',
+    '/schedule/:path*',
     // その他のルート（静的ファイル以外）
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ]

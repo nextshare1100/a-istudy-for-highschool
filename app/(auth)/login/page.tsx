@@ -1,8 +1,10 @@
+//app/(auth)/login/page.tsx
+
 'use client'
 
 import { LoginForm } from '@/components/auth/login-form';
 import Link from 'next/link';
-import { Sparkles, BookOpen, Brain, Target, GraduationCap, TrendingUp, Users, Info, ArrowRight } from 'lucide-react';
+import { Sparkles, BookOpen, Brain, Target, GraduationCap, TrendingUp, Users, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { collection, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -359,20 +361,6 @@ export default function LoginPage() {
       fontSize: isMobile ? '9px' : '12px',
       color: '#6b7280',
     },
-    infoCard: {
-      backgroundColor: '#eff6ff',
-      borderRadius: isMobile ? '8px' : '12px',
-      padding: isMobile ? '8px' : '16px',
-      display: 'flex',
-      gap: isMobile ? '6px' : '12px',
-      alignItems: 'flex-start',
-    },
-    infoContent: {
-      flex: 1,
-      fontSize: isMobile ? '10px' : '13px',
-      color: '#1e40af',
-      lineHeight: 1.4,
-    },
     termsText: {
       fontSize: isMobile ? '9px' : '12px',
       color: '#6b7280',
@@ -511,7 +499,7 @@ export default function LoginPage() {
                 <span style={styles.pulseCenter}></span>
               </span>
               <span style={styles.campaignText}>
-                キャンペーンコードで1ヶ月無料利用可能
+                今すぐ始めて学習をスタート
               </span>
             </div>
           </div>
@@ -538,15 +526,6 @@ export default function LoginPage() {
                 <span style={styles.statValue}>{improvementRate}%</span>
               </div>
               <div style={styles.statLabel}>成績向上</div>
-            </div>
-          </div>
-
-          {/* 情報カード */}
-          <div style={styles.infoCard}>
-            <Info size={12} color="#1e40af" style={{ flexShrink: 0 }} />
-            <div style={styles.infoContent}>
-              <strong>ご案内：</strong>
-              法人契約（学校・塾）でご利用の方は、ログイン後に法人IDを入力してください。
             </div>
           </div>
 
@@ -680,7 +659,7 @@ export default function LoginPage() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    今ならキャンペーンコードで1ヶ月無料利用可能
+                    今すぐ始めて学習をスタート
                   </span>
                 </div>
               </div>
