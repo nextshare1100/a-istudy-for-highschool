@@ -225,6 +225,7 @@ interface PassageMetadata {
   readingLevel: string;
   themes: string[];
   keyConcepts: string[];
+  language?: string;
 }
 
 interface ComprehensionQuestion {
@@ -739,7 +740,9 @@ function generateStandardPrompt(
     'fill_in_blank': '空欄に適切な答えを記入する問題',
     'solution_sequence': '解法の手順を正しい順序に並び替える問題',
     'sentence_sequence': '英文を文法的・意味的に正しい順序に並び替える問題',
-    'event_sequence': '歴史的出来事や物語の展開を時系列順に並び替える問題'
+    'event_sequence': '歴史的出来事や物語の展開を時系列順に並び替える問題',
+    'descriptive': '記述式問題（論理的な説明が必要）',
+    'essay': '論述式問題（200-400字程度）'
   };
 
   switch (stage) {
@@ -827,16 +830,29 @@ ${UNIFIED_JSON_FORMAT}`;
 \`\`\``;
 
     case 'explanation':
-      return `
+      // 問題タイプに応じて適切な解説を生成
+      const contextInfo = `
+科目: ${normalizedSubjectName}
+単元: ${topic}
+問題形式: ${problemType}
 問題: ${previousData?.question}
+${previousData?.options ? `選択肢:\n${previousData.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n')}` : ''}
 答え: ${previousData?.answer}
+${previousData?.passageText ? `\n文章:\n${previousData.passageText}` : ''}`;
 
-この問題の詳細な解説を作成してください。
+      return `
+${contextInfo}
+
+この問題について、以下の要素を含む詳細な解説を作成してください：
+1. なぜその答えが正解なのかの説明
+2. 間違いやすいポイントの解説
+3. 関連する知識や概念の説明
 
 \`\`\`json
 {
-  "explanation": "詳細な解説",
-  "hints": ["ヒント1", "ヒント2"]
+  "explanation": "詳細な解説（${normalizedSubjectName}の${topic}の内容に即した解説）",
+  "hints": ["ヒント1", "ヒント2"],
+  "keyPoints": ["重要ポイント1", "重要ポイント2"]
 }
 \`\`\``;
   }
@@ -900,11 +916,21 @@ ${UNIFIED_JSON_FORMAT}
 \`\`\``;
 
     case 'explanation':
-      return `
+      const formulaContext = `
+科目: ${normalizedSubjectName}
+単元: ${topic}
 問題: ${previousData?.question}
 答え: ${previousData?.answer}
+公式タイプ: ${previousData?.formulaType}
+公式名: ${previousData?.formulaName}`;
 
-この公式の詳細な解説を作成してください。
+      return `
+${formulaContext}
+
+この公式について、以下を含む詳細な解説を作成してください：
+1. 公式の意味と重要性
+2. 各空欄の答えがなぜその値になるのか
+3. 公式の使い方と応用例
 
 \`\`\`json
 {
@@ -919,7 +945,7 @@ ${UNIFIED_JSON_FORMAT}
   return '';
 }
 
-// ========== 長文読解問題プロンプト ==========
+// ========== 長文読解問題プロンプト（修正版） ==========
 function generateReadingComprehensionPrompt(
   request: GenerateProblemRequest,
   modelType: string,
@@ -964,6 +990,8 @@ function generateReadingComprehensionPrompt(
 ${isEnglish ? 'Write the passage entirely in English.' : '文章は日本語で書いてください。'}
 ${isEnglish ? 'Do NOT write in Japanese.' : '英語は使用しないでください。'}
 
+テーマ: ${topic}に関連した内容
+
 出力形式（JSONのみ）:
 \`\`\`json
 {
@@ -981,7 +1009,9 @@ ${isEnglish ? 'Do NOT write in Japanese.' : '英語は使用しないでくだ�
 
     case 'question':
       return `
-文章: ${previousData?.passageText}
+文章タイトル: ${previousData?.passageTitle}
+文章の内容: ${previousData?.passageText}
+テーマ: ${previousData?.passageMetadata?.themes?.join(', ')}
 
 この文章に基づいて、${settings.questionDepth}を問う選択問題を作成してください。
 科目: ${subjectName}
@@ -991,47 +1021,58 @@ ${isEnglish ? 'Do NOT write in Japanese.' : '英語は使用しないでくだ�
 \`\`\`json
 {
   "question": "${isEnglish ? 'Question in English' : '問題文を日本語で'}",
-  "questionType": "summary_choice" または "flow_sequence"
+  "questionType": "summary_choice"
 }
 \`\`\``;
 
     case 'options':
-      if (previousData?.questionType === 'flow_sequence') {
-        return `
-文章の流れを要約した選択肢を作成してください。
-言語: ${languageName}で選択肢を作成してください。
-
-\`\`\`json
-{
-  "format": "normal",
-  "options": ["${isEnglish ? 'Summary 1 in English' : '段落1の要約を日本語で'}", "${isEnglish ? 'Summary 2 in English' : '段落2の要約を日本語で'}", "${isEnglish ? 'Summary 3 in English' : '段落3の要約を日本語で'}", "${isEnglish ? 'Summary 4 in English' : '段落4の要約を日本語で'}"],
-  "correctOrder": "正しい順序",
-  "optionLabels": ["A", "B", "C", "D"]
-}
-\`\`\``;
-      }
-      
       return `
-内容要約の選択肢を4つ作成してください。
+文章: ${previousData?.passageText}
+問題: ${previousData?.question}
+
+この問題に対する選択肢を4つ作成してください。
+1つが正解で、3つは誤りですが、もっともらしい選択肢にしてください。
 言語: ${languageName}で選択肢を作成してください。
 
 \`\`\`json
 {
-  "options": ["${isEnglish ? 'Option 1 in English' : '要約1を日本語で'}", "${isEnglish ? 'Option 2 in English' : '要約2を日本語で'}", "${isEnglish ? 'Option 3 in English' : '要約3を日本語で'}", "${isEnglish ? 'Option 4 in English' : '要約4を日本語で'}"],
-  "answer": "${isEnglish ? 'The most appropriate summary in English' : '最も適切な要約を日本語で'}"
+  "options": ["${isEnglish ? 'Option 1 in English' : '選択肢1を日本語で'}", "${isEnglish ? 'Option 2 in English' : '選択肢2を日本語で'}", "${isEnglish ? 'Option 3 in English' : '選択肢3を日本語で'}", "${isEnglish ? 'Option 4 in English' : '選択肢4を日本語で'}"],
+  "answer": "${isEnglish ? 'The correct option' : '正解の選択肢'}"
 }
 \`\`\``;
 
     case 'explanation':
+      // 修正版: 文脈情報を完全に含める
+      const comprehensionContext = `
+科目: ${subjectName}
+言語: ${languageName}
+文章タイトル: ${previousData?.passageTitle}
+文章内容:
+${previousData?.passageText}
+
+問題: ${previousData?.question}
+
+選択肢:
+${previousData?.options ? previousData.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n') : ''}
+
+正解: ${previousData?.answer}`;
+
       return `
-文章と問題に基づいて解説を作成してください。
-言語: ${languageName}で解説を作成してください。
+${comprehensionContext}
+
+上記の長文読解問題について、以下の要素を含む詳細な解説を${languageName}で作成してください：
+
+1. なぜその選択肢が正解なのか、文章のどの部分が根拠となるか
+2. 他の選択肢がなぜ誤りなのか、具体的に説明
+3. 文章の要点と読解のポイント
+4. この種の問題を解く際のコツ
 
 \`\`\`json
 {
-  "explanation": "${isEnglish ? 'Explanation in English about why this is the correct answer' : 'なぜその選択肢が正解なのかの説明を日本語で'}",
-  "keyPoints": ["${isEnglish ? 'Key point in English' : '理解すべきポイントを日本語で'}"],
-  "hints": ["${isEnglish ? 'Reading tip in English' : '文章の読み方のヒントを日本語で'}"]
+  "explanation": "${isEnglish ? 'Detailed explanation in English' : '詳細な解説を日本語で（文章の具体的な部分を引用しながら説明）'}",
+  "keyPoints": ["${isEnglish ? 'Key point 1 in English' : '理解すべきポイント1を日本語で'}", "${isEnglish ? 'Key point 2 in English' : '理解すべきポイント2を日本語で'}"],
+  "hints": ["${isEnglish ? 'Reading tip in English' : '文章の読み方のヒントを日本語で'}"],
+  "textualEvidence": ["${isEnglish ? 'Quote from the passage' : '根拠となる文章の引用'}"]
 }
 \`\`\``;
   }
@@ -1039,7 +1080,7 @@ ${isEnglish ? 'Do NOT write in Japanese.' : '英語は使用しないでくだ�
   return '';
 }
 
-// ========== 語彙問題プロンプト ==========
+// ========== 語彙問題プロンプト（修正版） ==========
 function generateVocabularyPrompt(
   request: GenerateProblemRequest,
   modelType: string,
@@ -1079,6 +1120,7 @@ ${isEnglish ?
       return `
 問題: ${previousData?.question}
 語彙タイプ: ${previousData?.vocabularyType}
+対象語: ${previousData?.targetWord}
 科目: ${subjectName}
 
 適切な選択肢を4つ作成してください。
@@ -1092,15 +1134,30 @@ ${isEnglish ? '選択肢は日本語で作成してください。' : ''}
 \`\`\``;
 
     case 'explanation':
-      return `
-語彙問題の詳細な解説を作成してください。
+      const vocabularyContext = `
 科目: ${subjectName}
+問題: ${previousData?.question}
+対象語: ${previousData?.targetWord}
+語彙タイプ: ${previousData?.vocabularyType}
+選択肢: ${previousData?.options?.join(', ')}
+正解: ${previousData?.answer}`;
+
+      return `
+${vocabularyContext}
+
+この語彙問題の詳細な解説を作成してください。
+以下の要素を含めてください：
+1. なぜその選択肢が正解なのか
+2. 対象語の詳しい意味と用法
+3. 他の選択肢が誤りである理由
+4. 覚え方のコツや関連語
 
 \`\`\`json
 {
-  "explanation": "正解の理由と他の選択肢が誤りである理由",
-  "relatedWords": ["関連する語彙"],
-  "hints": ["覚え方のヒント"]
+  "explanation": "正解の理由と他の選択肢が誤りである理由の詳細な説明",
+  "relatedWords": ["関連する語彙1", "関連する語彙2"],
+  "hints": ["覚え方のヒント", "語源や成り立ち"],
+  "usageExamples": ["使用例1", "使用例2"]
 }
 \`\`\``;
   }
@@ -1362,7 +1419,7 @@ export async function POST(request: NextRequest) {
           
           if (optionsJson) {
             options = optionsJson.options;
-            answer = optionsJson.correctOrder;
+            answer = optionsJson.correctOrder || optionsJson.answer;
             
             controller.enqueue(encodeSSE({
               status: 'options_ready',
@@ -1390,6 +1447,8 @@ export async function POST(request: NextRequest) {
             ...passageData,
             ...questionData
           });
+          
+          debugLog('Options prompt for multiple choice', optionsPrompt);
           
           const optionsResult = await model.generateContent(optionsPrompt);
           const optionsText = optionsResult.response.text();
@@ -1440,16 +1499,20 @@ export async function POST(request: NextRequest) {
         
         // 解説の生成
         try {
+          // すべての生成済みデータをまとめる
+          const allPreviousData = {
+            ...passageData,
+            ...questionData,
+            answer: answer,
+            options: options,
+            normalizedSubjectName: normalizeSubjectName(body.subject, body.subjectName)
+          };
+          
           const explanationPrompt = generateOptimizedPrompt(
             body,
             modelDecision.modelName,
             'explanation',
-            {
-              ...passageData,
-              ...questionData,
-              answer: answer,
-              options: options
-            }
+            allPreviousData
           );
           debugLog('Explanation prompt', explanationPrompt);
           
@@ -1465,12 +1528,26 @@ export async function POST(request: NextRequest) {
               ...(explanationJson.relatedFormulas && { relatedFormulas: explanationJson.relatedFormulas }),
               ...(explanationJson.commonMistakes && { commonMistakes: explanationJson.commonMistakes }),
               ...(explanationJson.keyPoints && { keyPoints: explanationJson.keyPoints }),
-              ...(explanationJson.relatedWords && { relatedWords: explanationJson.relatedWords })
+              ...(explanationJson.relatedWords && { relatedWords: explanationJson.relatedWords }),
+              ...(explanationJson.textualEvidence && { textualEvidence: explanationJson.textualEvidence }),
+              ...(explanationJson.usageExamples && { usageExamples: explanationJson.usageExamples })
+            }));
+          } else {
+            // フォールバック解説
+            controller.enqueue(encodeSSE({
+              status: 'explanation_ready',
+              explanation: `この問題の答えは「${answer}」です。`,
+              hints: []
             }));
           }
         } catch (error) {
           debugLog('Explanation generation error', error);
           // 解説生成エラーは無視して続行
+          controller.enqueue(encodeSSE({
+            status: 'explanation_ready',
+            explanation: `この問題の答えは「${answer}」です。`,
+            hints: []
+          }));
         }
         
         // 完了
@@ -1541,3 +1618,4 @@ export async function OPTIONS(request: NextRequest) {
     }
   });
 }
+            
