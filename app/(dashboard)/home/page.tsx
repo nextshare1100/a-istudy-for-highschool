@@ -6,7 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { onAuthStateChanged, User } from 'firebase/auth'
 import { auth } from '@/lib/firebase/config'
 import { getUserProfile } from '@/lib/firebase/firestore'
+import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore'
+import { db } from '@/lib/firebase/config'
 import { getStudyTimeStats, getEfficiencyAnalysis, calculateUserStreak, getWeakSubjects, getUserLevel } from '@/lib/firebase/improved-analytics'
+import { getActiveSchedule, getDailyTasksForDate } from '@/lib/firebase/schedule'
+import type { DailyStudyPlan, StudySession } from '@/lib/firebase/schedule'
 import { getUserScheduleSettings, updateUserScheduleSettings } from '@/lib/firebase/dailyChallenge'
 import { useDailyChallengeAutoUpdate } from '@/hooks/useDailyChallengeAutoUpdate'
 import { 
@@ -15,13 +19,7 @@ import {
   getPersonalizedRecommendations,
   AffiliateProduct 
 } from '@/lib/amazon/affiliate'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2, X, Settings, Sun, Moon, Clock, Bell, BookOpen, ArrowRight, Calendar, Target, Timer, ChevronRight, Brain } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { getActiveSchedule, getDailyTasksForDate } from '@/lib/firebase/schedule'
-import type { DailyStudyPlan, StudySession } from '@/lib/firebase/schedule'
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase/config'
+import { Settings, Sun, Moon, Clock, Bell, BookOpen, ArrowRight, Calendar, Target, Timer, ChevronRight, Brain, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
@@ -61,8 +59,10 @@ export default function HomePage() {
   const searchParams = useSearchParams()
   const [greeting, setGreeting] = useState('こんにちは')
   const [currentDate, setCurrentDate] = useState('')
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  
+  // ユーザーデータ
   const [userData, setUserData] = useState<UserData>({
     displayName: null,
     studyTime: 0,
@@ -71,28 +71,11 @@ export default function HomePage() {
     hasData: false
   })
   const [displaySubjects, setDisplaySubjects] = useState<SubjectData[]>([])
-  const [challengeTimeLeft, setChallengeTimeLeft] = useState<string>('')
-  const [affiliateProducts, setAffiliateProducts] = useState<AffiliateProduct[]>([])
-  const [affiliateLoading, setAffiliateLoading] = useState(true)
-  const [loading, setLoading] = useState(true)
   
-  const [todaySchedule, setTodaySchedule] = useState<DailyStudyPlan | null>(null)
-  const [scheduleLoading, setScheduleLoading] = useState(false)
-  
-  const [recentProblems, setRecentProblems] = useState<RecentProblem[]>([])
-  const [problemsLoading, setProblemsLoading] = useState(false)
-  
-  const {
-    dailyChallenge: autoUpdatedChallenge,
-    isLoading: isChallengeLoading,
-    scheduleSettings: autoScheduleSettings,
-    checkForNewChallenge,
-    hasNewChallenge
-  } = useDailyChallengeAutoUpdate({ user: currentUser })
-  
+  // チャレンジ関連
   const [dailyChallenge, setDailyChallenge] = useState<any>(null)
+  const [challengeTimeLeft, setChallengeTimeLeft] = useState<string>('')
   const [showNewChallengeNotification, setShowNewChallengeNotification] = useState(false)
-  
   const [showTimeSettings, setShowTimeSettings] = useState(false)
   const [scheduleSettings, setScheduleSettings] = useState({
     morningTime: '07:00',
@@ -102,64 +85,28 @@ export default function HomePage() {
     notificationsEnabled: true
   })
   const [savingSettings, setSavingSettings] = useState(false)
-
-  const generateChallengeManually = async () => {
-    if (!currentUser) return
-    
-    try {
-      console.log('Manually generating challenge...')
-      const { getDailyChallenge } = await import('@/lib/firebase/dailyChallenge')
-      const newChallenge = await getDailyChallenge(currentUser.uid)
-      
-      if (newChallenge) {
-        console.log('Manual challenge generated:', newChallenge)
-        await checkForNewChallenge()
-      }
-    } catch (error) {
-      console.error('Error generating challenge manually:', error)
-    }
-  }
-
-  useEffect(() => {
-    console.log('Auto updated challenge:', autoUpdatedChallenge)
-    if (autoUpdatedChallenge) {
-      setDailyChallenge(autoUpdatedChallenge)
-      
-      if (hasNewChallenge) {
-        setShowNewChallengeNotification(true)
-        
-        setTimeout(() => {
-          setShowNewChallengeNotification(false)
-        }, 5000)
-      }
-    }
-  }, [autoUpdatedChallenge, hasNewChallenge])
-
-  useEffect(() => {
-    setScheduleSettings(autoScheduleSettings)
-  }, [autoScheduleSettings])
-
-  useEffect(() => {
-    const subscriptionStatus = searchParams.get('subscription')
-    const isWelcome = searchParams.get('welcome')
-    const updated = searchParams.get('updated')
-    
-    if (subscriptionStatus === 'success') {
-      setShowSuccessMessage(true)
-      
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
-    
-    if (updated === 'true') {
-      console.log('Settings updated, refreshing data...')
-      refreshUserData()
-      
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
-  }, [searchParams])
-
+  
+  // スケジュール関連
+  const [todaySchedule, setTodaySchedule] = useState<DailyStudyPlan | null>(null)
+  const [scheduleLoading, setScheduleLoading] = useState(false)
+  
+  // 問題関連
+  const [recentProblems, setRecentProblems] = useState<RecentProblem[]>([])
+  const [problemsLoading, setProblemsLoading] = useState(false)
+  
+  // アフィリエイト関連
+  const [affiliateProducts, setAffiliateProducts] = useState<AffiliateProduct[]>([])
+  const [affiliateLoading, setAffiliateLoading] = useState(true)
+  
+  // デイリーチャレンジ自動更新フック
+  const {
+    dailyChallenge: autoUpdatedChallenge,
+    isLoading: isChallengeLoading,
+    scheduleSettings: autoScheduleSettings,
+    checkForNewChallenge,
+    hasNewChallenge
+  } = useDailyChallengeAutoUpdate({ user: currentUser })
+  
   const subjectColors: { [key: string]: string } = {
     '現代文': '#10b981',
     '古文': '#059669',
@@ -242,36 +189,6 @@ export default function HomePage() {
     }
   }
 
-  const handleProductClick = (product: AffiliateProduct, userId: string) => {
-    trackAffiliateClick(product, userId)
-    
-    const affiliateUrl = generateAffiliateLink(product.asin)
-    window.open(affiliateUrl, '_blank', 'noopener,noreferrer')
-  }
-
-  useEffect(() => {
-    const updateTimeLeft = () => {
-      if (dailyChallenge && dailyChallenge.expiresAt) {
-        const now = new Date()
-        const expires = new Date(dailyChallenge.expiresAt)
-        const diff = expires.getTime() - now.getTime()
-        
-        if (diff > 0) {
-          const hours = Math.floor(diff / (1000 * 60 * 60))
-          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-          setChallengeTimeLeft(`${hours}時間${minutes}分`)
-        } else {
-          setChallengeTimeLeft('期限切れ')
-        }
-      }
-    }
-
-    updateTimeLeft()
-    const interval = setInterval(updateTimeLeft, 60000)
-
-    return () => clearInterval(interval)
-  }, [dailyChallenge])
-
   const loadTodaySchedule = async (userId: string) => {
     try {
       setScheduleLoading(true)
@@ -338,7 +255,6 @@ export default function HomePage() {
       loadAffiliateProducts(user.uid)
       loadTodaySchedule(user.uid)
       loadRecentProblems(user.uid)
-      loadRecentProblems(user.uid)
       
       if (userProfile && userProfile.subjects) {
         const subjectKeys = Object.keys(userProfile.subjects)
@@ -367,123 +283,48 @@ export default function HomePage() {
     }
   }
 
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout
+  const generateChallengeManually = async () => {
+    if (!currentUser) return
     
-    const handleFocus = () => {
-      if (isRefreshing) return
+    try {
+      console.log('Manually generating challenge...')
+      const { getDailyChallenge } = await import('@/lib/firebase/dailyChallenge')
+      const newChallenge = await getDailyChallenge(currentUser.uid)
       
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
-        console.log('Page focused, refreshing data...')
-        setIsRefreshing(true)
-        refreshUserData().finally(() => {
-          setIsRefreshing(false)
-        })
-      }, 500)
-    }
-
-    window.addEventListener('focus', handleFocus)
-    
-    if (document.visibilityState === 'visible' && !isRefreshing) {
-      setIsRefreshing(true)
-      refreshUserData().finally(() => {
-        setIsRefreshing(false)
-      })
-    }
-
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-      clearTimeout(timeoutId)
-    }
-  }, [currentUser])
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user)
-      
-      if (user) {
-        try {
-          const userProfile = await getUserProfile(user.uid)
-          console.log('User profile:', userProfile)
-          
-          const studyStats = await getStudyTimeStats(user.uid, 'month')
-          const currentStreak = await calculateUserStreak(user.uid)
-          
-          loadAffiliateProducts(user.uid)
-          loadTodaySchedule(user.uid)
-          loadRecentProblems(user.uid)
-          
-          if (userProfile && userProfile.subjects) {
-            const subjectKeys = Object.keys(userProfile.subjects)
-            console.log('Subject keys:', subjectKeys)
-            
-            const userData: UserData = {
-              displayName: userProfile.displayName || user.displayName,
-              studyTime: Math.floor(studyStats.monthlyTotal * 60),
-              currentStreak: currentStreak,
-              subjects: subjectKeys,
-              hasData: true
-            }
-            setUserData(userData)
-            
-            if (subjectKeys.length > 0) {
-              await generateSubjectCardsWithAnalytics(userData, user.uid)
-            } else {
-              console.log('No subjects found in profile')
-              setDisplaySubjects([])
-            }
-          } else {
-            console.log('No profile or subjects')
-            const mockUserData = getUserData()
-            setUserData(mockUserData)
-            generateSubjectCards(mockUserData)
-          }
-        } catch (error) {
-          console.error('Error fetching user profile:', error)
-          const mockUserData = getUserData()
-          setUserData(mockUserData)
-          generateSubjectCards(mockUserData)
-        }
-      } else {
-        const mockUserData = getUserData()
-        setUserData(mockUserData)
-        generateSubjectCards(mockUserData)
+      if (newChallenge) {
+        console.log('Manual challenge generated:', newChallenge)
+        await checkForNewChallenge()
       }
-      setLoading(false)
-    })
-
-    const now = new Date()
-    const hour = now.getHours()
-    
-    let greetingText = 'こんにちは'
-    if (hour < 12) greetingText = 'おはようございます'
-    else if (hour >= 18) greetingText = 'こんばんは'
-    
-    setGreeting(greetingText)
-    
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric', 
-      weekday: 'long' 
+    } catch (error) {
+      console.error('Error generating challenge manually:', error)
     }
-    const dateStr = now.toLocaleDateString('ja-JP', options)
-    setCurrentDate(dateStr)
+  }
 
-    return () => unsubscribe()
-  }, [])
-
-  const getUserData = (): UserData => {
-    return {
-      displayName: null,
-      studyTime: 0,
-      currentStreak: 0,
-      subjects: [],
-      hasData: false
+  const startDailyChallenge = () => {
+    if (dailyChallenge) {
+      router.push(`/problems/daily-challenge/${dailyChallenge.id}`)
     }
+  }
+
+  const handleSaveTimeSettings = async () => {
+    if (!currentUser) return
+    
+    setSavingSettings(true)
+    try {
+      await updateUserScheduleSettings(currentUser.uid, scheduleSettings)
+      setShowTimeSettings(false)
+    } catch (error) {
+      console.error('Error saving time settings:', error)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const handleProductClick = (product: AffiliateProduct, userId: string) => {
+    trackAffiliateClick(product, userId)
+    
+    const affiliateUrl = generateAffiliateLink(product.asin)
+    window.open(affiliateUrl, '_blank', 'noopener,noreferrer')
   }
 
   const getRandomSubjects = (subjects: string[], count: number): string[] => {
@@ -556,34 +397,6 @@ export default function HomePage() {
     setDisplaySubjects(subjectDataArray)
   }
 
-  const progressOffset = userData.hasData 
-    ? 565 - (565 * Math.min(userData.studyTime / 120, 1))
-    : 565
-
-  const hours = Math.floor(userData.studyTime / 60)
-  const minutes = userData.studyTime % 60
-  const timeDisplay = `${hours}:${minutes.toString().padStart(2, '0')}`
-
-  const startDailyChallenge = () => {
-    if (dailyChallenge) {
-      router.push(`/problems/daily-challenge/${dailyChallenge.id}`)
-    }
-  }
-
-  const handleSaveTimeSettings = async () => {
-    if (!currentUser) return
-    
-    setSavingSettings(true)
-    try {
-      await updateUserScheduleSettings(currentUser.uid, scheduleSettings)
-      setShowTimeSettings(false)
-    } catch (error) {
-      console.error('Error saving time settings:', error)
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
   const getStudyTypeLabel = (type: string) => {
     const labels: { [key: string]: string } = {
       'concept': '概念学習',
@@ -607,6 +420,194 @@ export default function HomePage() {
     }
     return difficultyMap[difficulty as keyof typeof difficultyMap] || difficultyMap.medium
   }
+
+  const getUserData = (): UserData => {
+    return {
+      displayName: null,
+      studyTime: 0,
+      currentStreak: 0,
+      subjects: [],
+      hasData: false
+    }
+  }
+
+  // 初期化（挨拶と日付設定）
+  useEffect(() => {
+    const now = new Date()
+    const hour = now.getHours()
+    
+    let greetingText = 'こんにちは'
+    if (hour < 12) greetingText = 'おはようございます'
+    else if (hour >= 18) greetingText = 'こんばんは'
+    
+    setGreeting(greetingText)
+    
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric', 
+      weekday: 'long' 
+    }
+    const dateStr = now.toLocaleDateString('ja-JP', options)
+    setCurrentDate(dateStr)
+  }, [])
+
+  // 認証状態監視
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user)
+      
+      if (user) {
+        try {
+          const userProfile = await getUserProfile(user.uid)
+          console.log('User profile:', userProfile)
+          
+          const studyStats = await getStudyTimeStats(user.uid, 'month')
+          const currentStreak = await calculateUserStreak(user.uid)
+          
+          loadAffiliateProducts(user.uid)
+          loadTodaySchedule(user.uid)
+          loadRecentProblems(user.uid)
+          
+          if (userProfile && userProfile.subjects) {
+            const subjectKeys = Object.keys(userProfile.subjects)
+            console.log('Subject keys:', subjectKeys)
+            
+            const userData: UserData = {
+              displayName: userProfile.displayName || user.displayName,
+              studyTime: Math.floor(studyStats.monthlyTotal * 60),
+              currentStreak: currentStreak,
+              subjects: subjectKeys,
+              hasData: true
+            }
+            setUserData(userData)
+            
+            if (subjectKeys.length > 0) {
+              await generateSubjectCardsWithAnalytics(userData, user.uid)
+            } else {
+              console.log('No subjects found in profile')
+              setDisplaySubjects([])
+            }
+          } else {
+            console.log('No profile or subjects')
+            const mockUserData = getUserData()
+            setUserData(mockUserData)
+            generateSubjectCards(mockUserData)
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error)
+          const mockUserData = getUserData()
+          setUserData(mockUserData)
+          generateSubjectCards(mockUserData)
+        }
+      } else {
+        const mockUserData = getUserData()
+        setUserData(mockUserData)
+        generateSubjectCards(mockUserData)
+      }
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  // チャレンジ時間更新
+  useEffect(() => {
+    const updateTimeLeft = () => {
+      if (dailyChallenge && dailyChallenge.expiresAt) {
+        const now = new Date()
+        const expires = new Date(dailyChallenge.expiresAt)
+        const diff = expires.getTime() - now.getTime()
+        
+        if (diff > 0) {
+          const hours = Math.floor(diff / (1000 * 60 * 60))
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+          setChallengeTimeLeft(`${hours}時間${minutes}分`)
+        } else {
+          setChallengeTimeLeft('期限切れ')
+        }
+      }
+    }
+
+    updateTimeLeft()
+    const interval = setInterval(updateTimeLeft, 60000)
+
+    return () => clearInterval(interval)
+  }, [dailyChallenge])
+
+  // データ自動更新
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+    
+    const handleFocus = () => {
+      if (isRefreshing) return
+      
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        console.log('Page focused, refreshing data...')
+        setIsRefreshing(true)
+        refreshUserData().finally(() => {
+          setIsRefreshing(false)
+        })
+      }, 500)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    
+    if (document.visibilityState === 'visible' && !isRefreshing) {
+      setIsRefreshing(true)
+      refreshUserData().finally(() => {
+        setIsRefreshing(false)
+      })
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      clearTimeout(timeoutId)
+    }
+  }, [currentUser])
+
+  // デイリーチャレンジ監視
+  useEffect(() => {
+    console.log('Auto updated challenge:', autoUpdatedChallenge)
+    if (autoUpdatedChallenge) {
+      setDailyChallenge(autoUpdatedChallenge)
+      
+      if (hasNewChallenge) {
+        setShowNewChallengeNotification(true)
+        
+        setTimeout(() => {
+          setShowNewChallengeNotification(false)
+        }, 5000)
+      }
+    }
+  }, [autoUpdatedChallenge, hasNewChallenge])
+
+  useEffect(() => {
+    setScheduleSettings(autoScheduleSettings)
+  }, [autoScheduleSettings])
+
+  // URLパラメータ処理（削除済みのサブスクリプション関連を除く）
+  useEffect(() => {
+    const updated = searchParams.get('updated')
+    
+    if (updated === 'true') {
+      console.log('Settings updated, refreshing data...')
+      refreshUserData()
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
+
+  const progressOffset = userData.hasData 
+    ? 565 - (565 * Math.min(userData.studyTime / 120, 1))
+    : 565
+
+  const hours = Math.floor(userData.studyTime / 60)
+  const minutes = userData.studyTime % 60
+  const timeDisplay = `${hours}:${minutes.toString().padStart(2, '0')}`
 
   return (
     <>
@@ -2027,28 +2028,6 @@ export default function HomePage() {
           >
             ✕
           </button>
-        </div>
-      )}
-
-      {/* サブスクリプション成功メッセージ */}
-      {showSuccessMessage && (
-        <div className="fixed top-2 right-2 z-50 max-w-sm animate-in slide-in-from-top-2 duration-300">
-          <Alert className="border-green-200 bg-green-50 shadow-lg text-xs">
-            <CheckCircle2 className="h-3 w-3 text-green-600" />
-            <AlertDescription className="text-green-800 pr-6">
-              <strong>プレミアムプランへようこそ！</strong>
-              <br />
-              アカウント登録とお支払いが正常に完了しました。
-            </AlertDescription>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 h-5 w-5 text-green-600 hover:text-green-800"
-              onClick={() => setShowSuccessMessage(false)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </Alert>
         </div>
       )}
 
