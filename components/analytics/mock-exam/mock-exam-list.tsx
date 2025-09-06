@@ -22,7 +22,6 @@ import { getMockExamResults, deleteMockExamResult } from '@/lib/firebase/firesto
 import { deleteImage } from '@/lib/firebase/storage'
 import { Timestamp } from 'firebase/firestore'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 
 // モバイル最適化スタイル定義
 const styles = {

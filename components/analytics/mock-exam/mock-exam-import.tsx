@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { saveMockExamResult } from '@/lib/firebase/firestore'
 import { Timestamp } from 'firebase/firestore'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import Papa from 'papaparse'
 
 // ブラウザ互換性のためのポリフィル
@@ -468,16 +468,39 @@ export default function MockExamImport() {
     })
   }, [])
 
-  // Excel インポート処理
+  // Excel インポート処理 - ExcelJSを使用
   const handleExcelImport = useCallback(async (file: File) => {
     setProcessing(true)
     
     try {
+      const workbook = new ExcelJS.Workbook()
       const arrayBuffer = await file.arrayBuffer()
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+      await workbook.xlsx.load(arrayBuffer)
+      
+      const worksheet = workbook.worksheets[0]
+      if (!worksheet) {
+        throw new Error('ワークシートが見つかりません')
+      }
+      
+      const jsonData: any[] = []
+      let headers: string[] = []
+      
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+          // ヘッダー行を取得
+          headers = row.values.slice(1) as string[] // 最初の空要素を除外
+        } else {
+          const rowData: any = {}
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            if (headers[colNumber - 1]) {
+              rowData[headers[colNumber - 1]] = cell.value
+            }
+          })
+          if (Object.keys(rowData).length > 0) {
+            jsonData.push(rowData)
+          }
+        }
+      })
       
       if (jsonData.length === 0) {
         throw new Error('データが見つかりません')
@@ -486,7 +509,6 @@ export default function MockExamImport() {
       // 最大100件まで
       const limitedData = jsonData.slice(0, 100)
       
-      const headers = Object.keys(limitedData[0])
       const autoMappings = createAutoMappings(headers)
       setMappings(autoMappings)
       
@@ -494,6 +516,7 @@ export default function MockExamImport() {
       setImportedData(parsed)
       setShowMapping(true)
     } catch (error) {
+      console.error('Excel読み込みエラー:', error)
       alert('Excelファイルの読み込みに失敗しました')
     } finally {
       setProcessing(false)
