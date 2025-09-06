@@ -21,28 +21,57 @@ import {
   RefreshCw,
   ChevronRight,
   Shuffle,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Languages
 } from 'lucide-react'
 
+// 統合された問題型定義
 interface Problem {
   id: string
-  creatorId: string
-  creatorName: string
+  createdBy?: string
+  creatorId?: string
+  creatorName?: string
   subject: string
-  grade: number
+  grade?: number
   difficulty: string
   topic: string
-  problemType: 'multiple-choice' | 'descriptive' | 'formula-fill' | 'solution-order'
+  type: string // 'multiple_choice' | 'fill_in_blank' | 'solution_sequence' | 'sentence_sequence' | 'event_sequence' | 'reading_comprehension' | 'vocabulary'
+  problemType?: string // 旧形式の互換性
   question: string
-  choices?: string[]
-  correctAnswer: string
+  
+  // 選択問題用
+  options?: string[]
+  choices?: string[] // 旧形式の互換性
+  correctAnswer: string | string[]
+  
+  // 穴埋め問題用
   formulaTemplate?: string
   formulaBlanks?: string[]
-  solutionSteps?: string[]
+  answer?: string | string[]
+  
+  // 並び替え問題用
+  sequences?: string[]
+  solutionSteps?: string[] // 旧形式の互換性
+  
+  // 長文読解用
+  passageTitle?: string
+  passageText?: string
+  
+  // 語彙問題用
+  vocabularyType?: string
+  targetWord?: string
+  
+  // 共通
   explanation: string
+  hints?: string[]
+  
+  // メタデータ
   metadata?: {
     targetDeviationValue?: number
     difficultyLevel?: string
+    categoryName?: string
+    subjectName?: string
   }
 }
 
@@ -61,7 +90,7 @@ export default function SolveProblemPage() {
   
   // 回答状態
   const [userAnswer, setUserAnswer] = useState('')
-  const [userAnswers, setUserAnswers] = useState<string[]>([]) // 穴埋め・並び替え用
+  const [userAnswers, setUserAnswers] = useState<string[]>([]) // 穴埋め用
   const [selectedChoice, setSelectedChoice] = useState('')
   const [attempts, setAttempts] = useState(0)
   const [submitted, setSubmitted] = useState(false)
@@ -73,28 +102,30 @@ export default function SolveProblemPage() {
   const [elapsedTime, setElapsedTime] = useState(0)
   
   // 並び替え問題用
-  const [shuffledSteps, setShuffledSteps] = useState<string[]>([])
-  const [orderedSteps, setOrderedSteps] = useState<string[]>([])
+  const [shuffledItems, setShuffledItems] = useState<string[]>([])
+  const [orderedItems, setOrderedItems] = useState<string[]>([])
   
   const router = useRouter()
   const params = useParams()
   const problemId = params?.id as string | undefined
 
-  // キーワード抽出関数（簡易版）
+  // 問題タイプの正規化
+  const getProblemType = (problem: Problem): string => {
+    return problem.type || problem.problemType || 'multiple_choice'
+  }
+
+  // キーワード抽出関数
   const extractKeywords = (explanation: string): string[] => {
-    // 解説文から重要そうなキーワードを抽出
     const keywords: string[] = []
     
-    // 「」で囲まれた用語を抽出
     const quotedTerms = explanation.match(/「([^」]+)」/g)
     if (quotedTerms) {
       keywords.push(...quotedTerms.map(term => term.replace(/[「」]/g, '')))
     }
     
-    // 重要そうな専門用語のパターン（例）
     const importantPatterns = [
       /[ぁ-んァ-ヶー一-龠０-９ａ-ｚＡ-Ｚ]+(?:法|定理|原理|効果|現象|反応|構造|機能|システム|理論)/g,
-      /[A-Za-z]+[A-Za-z0-9]*/g, // 英語の専門用語
+      /[A-Za-z]+[A-Za-z0-9]*/g,
     ]
     
     importantPatterns.forEach(pattern => {
@@ -104,48 +135,7 @@ export default function SolveProblemPage() {
       }
     })
     
-    // 重複を除去して返す
-    return [...new Set(keywords)].slice(0, 8) // 最大8個まで
-  }
-
-  // 話の流れ抽出関数
-  const extractFlowPoints = (explanation: string): string[] => {
-    const points: string[] = []
-    
-    // 箇条書きや番号付きリストを探す
-    const listPatterns = [
-      /(?:①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩)(.+?)(?=(?:①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩)|$)/g,
-      /(?:\d+[.)、])\s*(.+?)(?=(?:\d+[.)、])|$)/g,
-      /(?:・|•|▪|▸)\s*(.+?)(?=(?:・|•|▪|▸)|$)/g,
-    ]
-    
-    for (const pattern of listPatterns) {
-      const matches = explanation.matchAll(pattern)
-      for (const match of matches) {
-        if (match[1]) {
-          points.push(match[1].trim())
-        }
-      }
-      if (points.length > 0) break
-    }
-    
-    // リストが見つからない場合は、文を分割してポイントを抽出
-    if (points.length === 0) {
-      const sentences = explanation.split(/[。！？]/).filter(s => s.trim().length > 10)
-      
-      // キーとなる接続詞で始まる文を優先
-      const keyPhrases = ['まず', '次に', 'そして', '最後に', 'したがって', 'つまり', 'よって', '結果']
-      const keyPoints = sentences.filter(s => keyPhrases.some(phrase => s.includes(phrase)))
-      
-      if (keyPoints.length > 0) {
-        points.push(...keyPoints.slice(0, 5))
-      } else {
-        // 最初の数文を使用
-        points.push(...sentences.slice(0, 4))
-      }
-    }
-    
-    return points.map(p => p.replace(/^\s*[。、]/g, '').trim()).filter(p => p.length > 0)
+    return [...new Set(keywords)].slice(0, 8)
   }
 
   // タイマー更新
@@ -160,11 +150,7 @@ export default function SolveProblemPage() {
 
   // 問題の取得
   useEffect(() => {
-    // problemIdが存在しない場合は早期リターン
-    if (!problemId) {
-      console.log('Problem ID is not available yet')
-      return
-    }
+    if (!problemId) return
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -175,8 +161,13 @@ export default function SolveProblemPage() {
       setCurrentUser(user)
       
       try {
-        console.log('Fetching problem with ID:', problemId)
-        const problemDoc = await getDoc(doc(db, 'customProblems', problemId))
+        // まず通常の problems コレクションから取得を試みる
+        let problemDoc = await getDoc(doc(db, 'problems', problemId))
+        
+        // 存在しない場合は customProblems コレクションから取得
+        if (!problemDoc.exists()) {
+          problemDoc = await getDoc(doc(db, 'customProblems', problemId))
+        }
         
         if (!problemDoc.exists()) {
           setError('問題が見つかりません')
@@ -187,15 +178,20 @@ export default function SolveProblemPage() {
         const problemData = { id: problemDoc.id, ...problemDoc.data() } as Problem
         setProblem(problemData)
         
-        // 並び替え問題の場合、手順をシャッフル
-        if (problemData.problemType === 'solution-order' && problemData.solutionSteps) {
-          const shuffled = [...problemData.solutionSteps].sort(() => Math.random() - 0.5)
-          setShuffledSteps(shuffled)
+        const problemType = getProblemType(problemData)
+        
+        // 並び替え問題の場合、項目をシャッフル
+        if (['solution_sequence', 'sentence_sequence', 'event_sequence', 'solution-order'].includes(problemType)) {
+          const items = problemData.sequences || problemData.solutionSteps || []
+          const shuffled = [...items].sort(() => Math.random() - 0.5)
+          setShuffledItems(shuffled)
         }
         
         // 穴埋め問題の場合、回答配列を初期化
-        if (problemData.problemType === 'formula-fill' && problemData.formulaBlanks) {
-          setUserAnswers(new Array(problemData.formulaBlanks.length).fill(''))
+        if (['fill_in_blank', 'formula-fill'].includes(problemType)) {
+          const blanksCount = problemData.answer instanceof Array ? problemData.answer.length : 
+                              problemData.formulaBlanks ? problemData.formulaBlanks.length : 0
+          setUserAnswers(new Array(blanksCount).fill(''))
         }
         
         setStartTime(Date.now())
@@ -221,23 +217,32 @@ export default function SolveProblemPage() {
   const checkAnswer = () => {
     if (!problem) return false
     
-    switch (problem.problemType) {
+    const problemType = getProblemType(problem)
+    
+    switch (problemType) {
+      case 'multiple_choice':
       case 'multiple-choice':
+      case 'reading_comprehension':
+      case 'vocabulary':
         return selectedChoice === problem.correctAnswer
         
       case 'descriptive':
-        // 記述式は自己採点のため、ここでは常にfalseを返す
-        return false
+        return false // 自己採点
         
+      case 'fill_in_blank':
       case 'formula-fill':
-        // すべての空欄が正解と一致するかチェック
-        return problem.formulaBlanks?.every((blank, index) => 
-          userAnswers[index]?.trim().toLowerCase() === blank.toLowerCase()
-        ) || false
+        const correctAnswers = problem.answer instanceof Array ? problem.answer : 
+                              problem.formulaBlanks || []
+        return correctAnswers.every((answer, index) => 
+          userAnswers[index]?.trim().toLowerCase() === answer.toLowerCase()
+        )
         
+      case 'solution_sequence':
+      case 'sentence_sequence':
+      case 'event_sequence':
       case 'solution-order':
-        // 手順の順序が正しいかチェック
-        return JSON.stringify(orderedSteps) === JSON.stringify(problem.solutionSteps)
+        const correctSequence = problem.sequences || problem.solutionSteps || []
+        return JSON.stringify(orderedItems) === JSON.stringify(correctSequence)
         
       default:
         return false
@@ -248,28 +253,27 @@ export default function SolveProblemPage() {
   const handleSubmit = async () => {
     if (!problem || !currentUser) return
     
-    // 回答チェック
     const correct = checkAnswer()
     setIsCorrect(correct)
     setSubmitted(true)
     setAttempts(attempts + 1)
     
-    // 学習記録を保存
     try {
+      const problemType = getProblemType(problem)
       const studySession: StudyResult = {
         correct,
         timeSpent: elapsedTime,
-        userAnswer: problem.problemType === 'multiple-choice' ? selectedChoice : 
-                    problem.problemType === 'descriptive' ? userAnswer :
-                    problem.problemType === 'formula-fill' ? userAnswers :
-                    orderedSteps,
+        userAnswer: ['multiple_choice', 'reading_comprehension', 'vocabulary'].includes(problemType) ? selectedChoice :
+                    problemType === 'descriptive' ? userAnswer :
+                    ['fill_in_blank', 'formula-fill'].includes(problemType) ? userAnswers :
+                    orderedItems,
         attempts: attempts + 1
       }
       
       await addDoc(collection(db, 'studySessions'), {
         userId: currentUser.uid,
         problemId: problem.id,
-        problemType: problem.problemType,
+        problemType: problemType,
         subject: problem.subject,
         topic: problem.topic,
         difficulty: problem.difficulty,
@@ -280,7 +284,6 @@ export default function SolveProblemPage() {
       console.error('学習記録の保存エラー:', error)
     }
     
-    // 正解の場合は自動的に解説を表示
     if (correct) {
       setTimeout(() => setShowExplanation(true), 1000)
     }
@@ -293,20 +296,126 @@ export default function SolveProblemPage() {
     setShowExplanation(false)
     setSelectedChoice('')
     setUserAnswer('')
-    setUserAnswers(new Array(problem?.formulaBlanks?.length || 0).fill(''))
-    setOrderedSteps([])
+    const problemType = getProblemType(problem!)
+    if (['fill_in_blank', 'formula-fill'].includes(problemType)) {
+      const blanksCount = problem?.answer instanceof Array ? problem.answer.length :
+                         problem?.formulaBlanks ? problem.formulaBlanks.length : 0
+      setUserAnswers(new Array(blanksCount).fill(''))
+    }
+    setOrderedItems([])
     setStartTime(Date.now())
   }
 
   // 並び替え問題の操作
-  const addToOrder = (step: string) => {
-    if (!orderedSteps.includes(step)) {
-      setOrderedSteps([...orderedSteps, step])
+  const addToOrder = (item: string) => {
+    if (!orderedItems.includes(item)) {
+      setOrderedItems([...orderedItems, item])
     }
   }
 
   const removeFromOrder = (index: number) => {
-    setOrderedSteps(orderedSteps.filter((_, i) => i !== index))
+    setOrderedItems(orderedItems.filter((_, i) => i !== index))
+  }
+
+  // 穴埋め問題のテンプレート表示
+  const renderFillInBlankTemplate = () => {
+    if (!problem) return null
+    
+    if (problem.question.includes('____') || problem.question.includes('□')) {
+      // 問題文に空欄が含まれている場合
+      const parts = problem.question.split(/____|\□/)
+      return (
+        <div className="p-4 bg-gray-50 rounded-lg">
+          {parts.map((part, index) => (
+            <span key={index}>
+              {part}
+              {index < parts.length - 1 && (
+                <input
+                  type="text"
+                  value={userAnswers[index] || ''}
+                  onChange={(e) => {
+                    const newAnswers = [...userAnswers]
+                    newAnswers[index] = e.target.value
+                    setUserAnswers(newAnswers)
+                  }}
+                  disabled={submitted}
+                  className={`inline-block mx-1 px-3 py-1 rounded border-2 ${
+                    submitted
+                      ? userAnswers[index]?.trim().toLowerCase() === 
+                        (problem.answer instanceof Array ? problem.answer[index] : '').toLowerCase()
+                        ? 'border-green-500 bg-green-100'
+                        : 'border-red-500 bg-red-100'
+                      : 'border-blue-300 bg-yellow-100'
+                  } ${submitted ? 'cursor-not-allowed' : ''}`}
+                  style={{ width: '120px' }}
+                />
+              )}
+            </span>
+          ))}
+        </div>
+      )
+    } else if (problem.formulaTemplate) {
+      // 旧形式の互換性
+      return (
+        <div className="p-4 bg-gray-50 rounded-lg font-mono text-lg">
+          {problem.formulaTemplate.split(/\[|\]/).map((part, index) => (
+            <span key={index}>
+              {index % 2 === 0 ? (
+                part
+              ) : (
+                <input
+                  type="text"
+                  value={userAnswers[Math.floor(index / 2)] || ''}
+                  onChange={(e) => {
+                    const newAnswers = [...userAnswers]
+                    newAnswers[Math.floor(index / 2)] = e.target.value
+                    setUserAnswers(newAnswers)
+                  }}
+                  disabled={submitted}
+                  className={`inline-block mx-1 px-3 py-1 rounded border-2 ${
+                    submitted
+                      ? userAnswers[Math.floor(index / 2)]?.trim().toLowerCase() === 
+                        (problem.formulaBlanks?.[Math.floor(index / 2)] || '').toLowerCase()
+                        ? 'border-green-500 bg-green-100'
+                        : 'border-red-500 bg-red-100'
+                      : 'border-blue-300 bg-yellow-100'
+                  } ${submitted ? 'cursor-not-allowed' : ''}`}
+                  style={{ width: '80px' }}
+                />
+              )}
+            </span>
+          ))}
+        </div>
+      )
+    } else {
+      // 通常の入力フィールド
+      return (
+        <div className="space-y-2">
+          {userAnswers.map((answer, index) => (
+            <div key={index}>
+              <Label>空欄{index + 1}</Label>
+              <Input
+                type="text"
+                value={answer}
+                onChange={(e) => {
+                  const newAnswers = [...userAnswers]
+                  newAnswers[index] = e.target.value
+                  setUserAnswers(newAnswers)
+                }}
+                disabled={submitted}
+                className={submitted
+                  ? answer.trim().toLowerCase() === 
+                    (problem.answer instanceof Array ? problem.answer[index] : '').toLowerCase()
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-red-500 bg-red-50'
+                  : ''
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )
+    }
   }
 
   if (loading) {
@@ -334,6 +443,8 @@ export default function SolveProblemPage() {
     )
   }
 
+  const problemType = getProblemType(problem)
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -348,7 +459,6 @@ export default function SolveProblemPage() {
             問題一覧
           </Button>
           
-          {/* タイマー */}
           {!submitted && (
             <div className="flex items-center gap-2 text-gray-600">
               <Clock size={20} />
@@ -361,69 +471,110 @@ export default function SolveProblemPage() {
         <div className="card-custom mb-6 fade-in">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
-              {problem.subject}
+              {problem.metadata?.subjectName || problem.subject}
             </span>
             <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full">
               {problem.topic}
             </span>
             <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
               {problem.difficulty === 'easy' ? '基礎' : 
-               problem.difficulty === 'normal' ? '標準' : '発展'}
+               problem.difficulty === 'medium' || problem.difficulty === 'normal' ? '標準' : '発展'}
             </span>
             {problem.metadata?.targetDeviationValue && (
               <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full">
                 偏差値 {problem.metadata.targetDeviationValue}
               </span>
             )}
+            {problem.vocabularyType && (
+              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full">
+                <Languages size={14} className="inline mr-1" />
+                {problem.vocabularyType === 'kanji' ? '漢字' :
+                 problem.vocabularyType === 'kobun' ? '古文' :
+                 problem.vocabularyType === 'kanbun' ? '漢文' :
+                 problem.vocabularyType === 'english_word' ? '英単語' :
+                 problem.vocabularyType === 'english_idiom' ? '英熟語' : 
+                 problem.vocabularyType}
+              </span>
+            )}
           </div>
         </div>
 
+        {/* 長文読解の場合、文章を表示 */}
+        {problemType === 'reading_comprehension' && problem.passageText && (
+          <div className="card-custom mb-6 fade-in" style={{animationDelay: '0.1s'}}>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <FileText className="text-blue-500" size={24} />
+              {problem.passageTitle || '文章'}
+            </h2>
+            <div className="p-4 bg-gray-50 rounded-lg max-h-96 overflow-y-auto">
+              <p className="text-base leading-relaxed whitespace-pre-wrap">{problem.passageText}</p>
+            </div>
+          </div>
+        )}
+
         {/* 問題文 */}
-        <div className="card-custom mb-6 fade-in" style={{animationDelay: '0.1s'}}>
+        <div className="card-custom mb-6 fade-in" style={{animationDelay: '0.2s'}}>
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Brain className="text-blue-500" size={24} />
             問題
           </h2>
-          <p className="text-lg leading-relaxed">{problem.question}</p>
+          <div className="text-lg leading-relaxed">
+            {/* 語彙問題の場合、対象単語を強調 */}
+            {problemType === 'vocabulary' && problem.targetWord ? (
+              <p>
+                {problem.question.split(problem.targetWord).map((part, index, array) => (
+                  <span key={index}>
+                    {part}
+                    {index < array.length - 1 && (
+                      <span className="font-bold text-blue-600 bg-blue-50 px-1 rounded">
+                        {problem.targetWord}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <p>{problem.question}</p>
+            )}
+          </div>
         </div>
 
         {/* 回答エリア */}
         {!showExplanation && (
-          <div className="card-custom mb-6 fade-in" style={{animationDelay: '0.2s'}}>
+          <div className="card-custom mb-6 fade-in" style={{animationDelay: '0.3s'}}>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Target className="text-orange-500" size={20} />
               回答
             </h3>
 
-            {/* 選択式 */}
-            {problem.problemType === 'multiple-choice' && problem.choices && (
+            {/* 選択式・長文読解・語彙問題 */}
+            {['multiple_choice', 'multiple-choice', 'reading_comprehension', 'vocabulary'].includes(problemType) && 
+             (problem.options || problem.choices) && (
               <div className="space-y-3">
-                {problem.choices.map((choice, index) => (
+                {(problem.options || problem.choices || []).map((choice, index) => (
                   <button
                     key={index}
-                    onClick={() => !submitted && setSelectedChoice(String.fromCharCode(65 + index))}
+                    onClick={() => !submitted && setSelectedChoice(choice)}
                     disabled={submitted}
                     className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
                       submitted
-                        ? selectedChoice === String.fromCharCode(65 + index)
+                        ? selectedChoice === choice
                           ? isCorrect
                             ? 'border-green-500 bg-green-50'
                             : 'border-red-500 bg-red-50'
-                          : problem.correctAnswer === String.fromCharCode(65 + index)
+                          : problem.correctAnswer === choice
                             ? 'border-green-500 bg-green-50'
                             : 'border-gray-200 bg-gray-50'
-                        : selectedChoice === String.fromCharCode(65 + index)
+                        : selectedChoice === choice
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                     } ${submitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    <span className="font-medium">
-                      {String.fromCharCode(65 + index)}) {choice}
-                    </span>
-                    {submitted && problem.correctAnswer === String.fromCharCode(65 + index) && (
+                    <span className="font-medium">{choice}</span>
+                    {submitted && problem.correctAnswer === choice && (
                       <CheckCircle className="inline-block ml-2 text-green-500" size={20} />
                     )}
-                    {submitted && selectedChoice === String.fromCharCode(65 + index) && !isCorrect && (
+                    {submitted && selectedChoice === choice && !isCorrect && (
                       <XCircle className="inline-block ml-2 text-red-500" size={20} />
                     )}
                   </button>
@@ -432,7 +583,7 @@ export default function SolveProblemPage() {
             )}
 
             {/* 記述式 */}
-            {problem.problemType === 'descriptive' && (
+            {problemType === 'descriptive' && (
               <div>
                 <textarea
                   value={userAnswer}
@@ -449,70 +600,33 @@ export default function SolveProblemPage() {
               </div>
             )}
 
-            {/* 公式穴埋め */}
-            {problem.problemType === 'formula-fill' && problem.formulaTemplate && (
-              <div>
-                <div className="p-4 bg-gray-50 rounded-lg font-mono text-lg mb-4">
-                  {problem.formulaTemplate.split(/\[|\]/).map((part, index) => (
-                    <span key={index}>
-                      {index % 2 === 0 ? (
-                        part
-                      ) : (
-                        <input
-                          type="text"
-                          value={userAnswers[Math.floor(index / 2)] || ''}
-                          onChange={(e) => {
-                            const newAnswers = [...userAnswers]
-                            newAnswers[Math.floor(index / 2)] = e.target.value
-                            setUserAnswers(newAnswers)
-                          }}
-                          disabled={submitted}
-                          className={`inline-block mx-1 px-3 py-1 rounded border-2 ${
-                            submitted
-                              ? userAnswers[Math.floor(index / 2)]?.trim().toLowerCase() === 
-                                problem.formulaBlanks?.[Math.floor(index / 2)]?.toLowerCase()
-                                ? 'border-green-500 bg-green-100'
-                                : 'border-red-500 bg-red-100'
-                              : 'border-blue-300 bg-yellow-100'
-                          } ${submitted ? 'cursor-not-allowed' : ''}`}
-                          style={{ width: '80px' }}
-                        />
-                      )}
-                    </span>
-                  ))}
-                </div>
-                {submitted && problem.formulaBlanks && (
-                  <div className="mt-2 text-sm">
-                    <p className="font-medium">正解:</p>
-                    {problem.formulaBlanks.map((blank, index) => (
-                      <span key={index} className="inline-block mr-4">
-                        空欄{index + 1}: <span className="font-bold text-green-600">{blank}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* 穴埋め */}
+            {['fill_in_blank', 'formula-fill'].includes(problemType) && renderFillInBlankTemplate()}
 
-            {/* 解法並び替え */}
-            {problem.problemType === 'solution-order' && (
+            {/* 並び替え問題 */}
+            {['solution_sequence', 'sentence_sequence', 'event_sequence', 'solution-order'].includes(problemType) && (
               <div className="grid md:grid-cols-2 gap-4">
                 {/* 選択肢 */}
                 <div>
-                  <h4 className="font-medium mb-2">手順（クリックして追加）</h4>
+                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                    <Shuffle size={16} />
+                    {problemType === 'sentence_sequence' ? '文の要素' :
+                     problemType === 'event_sequence' ? '出来事' : '手順'}
+                    （クリックして追加）
+                  </h4>
                   <div className="space-y-2">
-                    {shuffledSteps.map((step, index) => (
+                    {shuffledItems.map((item, index) => (
                       <button
                         key={index}
-                        onClick={() => !submitted && addToOrder(step)}
-                        disabled={submitted || orderedSteps.includes(step)}
+                        onClick={() => !submitted && addToOrder(item)}
+                        disabled={submitted || orderedItems.includes(item)}
                         className={`w-full p-3 text-left rounded-lg border transition-all ${
-                          orderedSteps.includes(step)
+                          orderedItems.includes(item)
                             ? 'border-gray-300 bg-gray-100 opacity-50'
                             : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50'
                         } ${submitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                       >
-                        {step}
+                        <span className="text-sm">{item}</span>
                       </button>
                     ))}
                   </div>
@@ -520,28 +634,31 @@ export default function SolveProblemPage() {
 
                 {/* 回答 */}
                 <div>
-                  <h4 className="font-medium mb-2">正しい順序（クリックして削除）</h4>
+                  <h4 className="font-medium mb-2">
+                    正しい順序（クリックして削除）
+                  </h4>
                   <div className="space-y-2">
-                    {orderedSteps.map((step, index) => (
+                    {orderedItems.map((item, index) => (
                       <button
                         key={index}
                         onClick={() => !submitted && removeFromOrder(index)}
                         disabled={submitted}
                         className={`w-full p-3 text-left rounded-lg border-2 transition-all ${
                           submitted
-                            ? step === problem.solutionSteps?.[index]
+                            ? item === (problem.sequences || problem.solutionSteps)?.[index]
                               ? 'border-green-500 bg-green-50'
                               : 'border-red-500 bg-red-50'
                             : 'border-blue-500 bg-blue-50 hover:border-red-400'
                         } ${submitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <span className="font-bold mr-2">{index + 1}.</span>
-                        {step}
+                        <span className="text-sm">{item}</span>
                       </button>
                     ))}
-                    {orderedSteps.length === 0 && (
+                    {orderedItems.length === 0 && (
                       <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500">
-                        上の手順をクリックして追加
+                        上の{problemType === 'sentence_sequence' ? '要素' :
+                             problemType === 'event_sequence' ? '出来事' : '手順'}をクリックして追加
                       </div>
                     )}
                   </div>
@@ -553,15 +670,15 @@ export default function SolveProblemPage() {
 
         {/* 提出ボタン・結果表示 */}
         {!showExplanation && (
-          <div className="text-center mb-6 fade-in" style={{animationDelay: '0.3s'}}>
+          <div className="text-center mb-6 fade-in" style={{animationDelay: '0.4s'}}>
             {!submitted ? (
               <Button
                 onClick={handleSubmit}
                 disabled={
-                  (problem.problemType === 'multiple-choice' && !selectedChoice) ||
-                  (problem.problemType === 'descriptive' && !userAnswer.trim()) ||
-                  (problem.problemType === 'formula-fill' && userAnswers.some(a => !a.trim())) ||
-                  (problem.problemType === 'solution-order' && orderedSteps.length === 0)
+                  (['multiple_choice', 'multiple-choice', 'reading_comprehension', 'vocabulary'].includes(problemType) && !selectedChoice) ||
+                  (problemType === 'descriptive' && !userAnswer.trim()) ||
+                  (['fill_in_blank', 'formula-fill'].includes(problemType) && userAnswers.some(a => !a.trim())) ||
+                  (['solution_sequence', 'sentence_sequence', 'event_sequence', 'solution-order'].includes(problemType) && orderedItems.length === 0)
                 }
                 className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-8 py-3 text-lg"
               >
@@ -587,10 +704,10 @@ export default function SolveProblemPage() {
                       <XCircle size={32} />
                       <div className="text-left">
                         <p className="text-2xl font-bold">
-                          {problem.problemType === 'descriptive' ? '回答を確認' : '不正解'}
+                          {problemType === 'descriptive' ? '回答を確認' : '不正解'}
                         </p>
                         <p className="text-sm">
-                          {problem.problemType === 'descriptive' 
+                          {problemType === 'descriptive' 
                             ? '解説を読んで理解を深めましょう' 
                             : 'もう一度考えてみましょう'}
                         </p>
@@ -601,7 +718,7 @@ export default function SolveProblemPage() {
 
                 {/* アクションボタン */}
                 <div className="flex justify-center gap-3">
-                  {!isCorrect && problem.problemType !== 'descriptive' && (
+                  {!isCorrect && problemType !== 'descriptive' && (
                     <Button
                       variant="outline"
                       onClick={handleRetry}
@@ -632,10 +749,36 @@ export default function SolveProblemPage() {
               解説
             </h3>
             
-            {/* 記述式問題の場合：キーワードと話の流れ */}
-            {problem.problemType === 'descriptive' && (
+            {/* 正解の表示 */}
+            {submitted && (
+              <div className="mb-4 p-4 bg-white/70 rounded-lg">
+                <p className="font-medium mb-2">正解:</p>
+                {['multiple_choice', 'multiple-choice', 'reading_comprehension', 'vocabulary'].includes(problemType) ? (
+                  <p className="text-lg font-bold text-green-600">{problem.correctAnswer}</p>
+                ) : ['fill_in_blank', 'formula-fill'].includes(problemType) ? (
+                  <div className="space-y-1">
+                    {(problem.answer instanceof Array ? problem.answer : problem.formulaBlanks || []).map((answer, index) => (
+                      <p key={index} className="font-bold text-green-600">
+                        空欄{index + 1}: {answer}
+                      </p>
+                    ))}
+                  </div>
+                ) : ['solution_sequence', 'sentence_sequence', 'event_sequence', 'solution-order'].includes(problemType) ? (
+                  <ol className="space-y-2">
+                    {(problem.sequences || problem.solutionSteps || []).map((item, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="font-bold text-blue-600">{index + 1}.</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+              </div>
+            )}
+
+            {/* 記述式問題のキーワード */}
+            {problemType === 'descriptive' && (
               <div className="mb-6 space-y-4">
-                {/* キーワード */}
                 <div className="p-4 bg-yellow-50 rounded-lg">
                   <h4 className="font-medium mb-2 flex items-center gap-2">
                     <Target className="text-yellow-600" size={18} />
@@ -649,52 +792,18 @@ export default function SolveProblemPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* 話の流れ */}
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <TrendingUp className="text-blue-600" size={18} />
-                    解答の流れ
-                  </h4>
-                  <ol className="space-y-2">
-                    {extractFlowPoints(problem.explanation).map((point, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <span className="flex-shrink-0 w-6 h-6 bg-blue-200 text-blue-700 rounded-full text-xs flex items-center justify-center font-bold">
-                          {index + 1}
-                        </span>
-                        <span className="text-sm">{point}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                {/* 自己採点のヒント */}
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <CheckCircle className="text-green-600" size={18} />
-                    自己採点のポイント
-                  </h4>
-                  <ul className="space-y-1 text-sm">
-                    <li>• 上記のキーワードが含まれているか確認</li>
-                    <li>• 論理的な流れで説明できているか確認</li>
-                    <li>• 問題で求められた内容に答えているか確認</li>
-                  </ul>
-                </div>
               </div>
             )}
-            
-            {/* 正解の表示（並び替え問題の場合） */}
-            {problem.problemType === 'solution-order' && problem.solutionSteps && (
-              <div className="mb-4 p-4 bg-white/70 rounded-lg">
-                <p className="font-medium mb-2">正しい手順:</p>
-                <ol className="space-y-2">
-                  {problem.solutionSteps.map((step, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span className="font-bold text-blue-600">{index + 1}.</span>
-                      <span>{step}</span>
-                    </li>
+
+            {/* ヒント */}
+            {problem.hints && problem.hints.length > 0 && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-medium mb-2">ヒント</h4>
+                <ul className="space-y-1">
+                  {problem.hints.map((hint, index) => (
+                    <li key={index} className="text-sm">• {hint}</li>
                   ))}
-                </ol>
+                </ul>
               </div>
             )}
             
@@ -722,14 +831,14 @@ export default function SolveProblemPage() {
                 <div>
                   <p className="text-sm text-gray-600">正答率</p>
                   <p className="text-lg font-bold">
-                    {isCorrect ? '100%' : problem.problemType === 'descriptive' ? '-' : '0%'}
+                    {isCorrect ? '100%' : problemType === 'descriptive' ? '-' : '0%'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">難易度</p>
                   <p className="text-lg font-bold">
                     {problem.difficulty === 'easy' ? '基礎' : 
-                     problem.difficulty === 'normal' ? '標準' : '発展'}
+                     problem.difficulty === 'medium' || problem.difficulty === 'normal' ? '標準' : '発展'}
                   </p>
                 </div>
               </div>
@@ -751,13 +860,6 @@ export default function SolveProblemPage() {
               >
                 <Brain size={16} />
                 新しい問題を作成
-              </Button>
-              <Button
-                onClick={() => router.push('/study')}
-                className="flex items-center gap-2"
-              >
-                <TrendingUp size={16} />
-                AI学習を続ける
               </Button>
             </div>
           </div>
