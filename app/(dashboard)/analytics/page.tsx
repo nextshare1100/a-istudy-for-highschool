@@ -30,7 +30,9 @@ import {
   Type,
   MessageSquare,
   Calculator,
-  Circle
+  Circle,
+  Menu,
+  X
 } from 'lucide-react'
 import { 
   LineChart, 
@@ -50,6 +52,13 @@ import {
   ComposedChart,
   Legend
 } from 'recharts'
+
+// ブレークポイント定義
+const BREAKPOINTS = {
+  mobile: 640,
+  tablet: 768,
+  desktop: 1024
+}
 
 // レスポンシブ対応スタイルオブジェクト
 const styles = {
@@ -71,6 +80,9 @@ const styles = {
     maxWidth: '1200px',
     margin: '0 auto',
     padding: '16px 24px',
+    '@media (max-width: 640px)': {
+      padding: '12px 16px',
+    }
   },
   headerTitle: {
     display: 'flex',
@@ -92,6 +104,9 @@ const styles = {
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
+    '@media (max-width: 640px)': {
+      fontSize: '20px',
+    }
   },
   subtitle: {
     color: '#6b7280',
@@ -112,6 +127,10 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
     boxShadow: '0 2px 6px rgba(147, 51, 234, 0.3)',
+    '@media (max-width: 640px)': {
+      padding: '8px 16px',
+      fontSize: '13px',
+    }
   },
   secondaryButton: {
     display: 'flex',
@@ -141,6 +160,11 @@ const styles = {
       border: '1px solid transparent',
       position: 'relative' as const,
       whiteSpace: 'nowrap' as const,
+      '@media (max-width: 640px)': {
+        padding: '8px 12px',
+        fontSize: '13px',
+        gap: '4px',
+      }
     },
     inactive: {
       background: 'white',
@@ -163,6 +187,10 @@ const styles = {
       transition: 'all 0.3s ease',
       cursor: 'pointer',
       border: '1px solid transparent',
+      '@media (max-width: 640px)': {
+        padding: '6px 12px',
+        fontSize: '12px',
+      }
     },
     inactive: {
       background: 'white',
@@ -179,6 +207,9 @@ const styles = {
     maxWidth: '1200px',
     margin: '0 auto',
     padding: '24px',
+    '@media (max-width: 640px)': {
+      padding: '16px',
+    }
   },
   mainCard: {
     background: 'linear-gradient(135deg, #ffffff 95%, #f9fafb 100%)',
@@ -188,6 +219,10 @@ const styles = {
     padding: '24px',
     position: 'relative' as const,
     overflow: 'hidden',
+    '@media (max-width: 640px)': {
+      padding: '16px',
+      borderRadius: '12px',
+    }
   },
   metricCard: {
     base: {
@@ -200,6 +235,10 @@ const styles = {
       cursor: 'pointer',
       position: 'relative' as const,
       overflow: 'hidden',
+      '@media (max-width: 640px)': {
+        padding: '16px',
+        borderRadius: '12px',
+      }
     },
     hover: {
       transform: 'translateY(-2px)',
@@ -224,6 +263,9 @@ const styles = {
       border: '1px solid #e5e7eb',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
+      '@media (max-width: 640px)': {
+        padding: '12px',
+      }
     },
     hover: {
       background: '#f3f4f6',
@@ -237,6 +279,9 @@ const styles = {
     justifyContent: 'center',
     padding: '48px 24px',
     textAlign: 'center' as const,
+    '@media (max-width: 640px)': {
+      padding: '32px 16px',
+    }
   },
   badge: {
     display: 'inline-flex',
@@ -246,6 +291,10 @@ const styles = {
     borderRadius: '9999px',
     fontSize: '12px',
     fontWeight: '500',
+    '@media (max-width: 640px)': {
+      padding: '3px 10px',
+      fontSize: '11px',
+    }
   },
   levelCard: {
     background: 'white',
@@ -254,6 +303,9 @@ const styles = {
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
     marginBottom: '16px',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+    }
   },
   chartCard: {
     background: 'white',
@@ -261,6 +313,10 @@ const styles = {
     padding: '24px',
     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
     border: '1px solid #e5e7eb',
+    '@media (max-width: 640px)': {
+      padding: '16px',
+      borderRadius: '12px',
+    }
   },
   infoBox: {
     padding: '12px',
@@ -269,7 +325,11 @@ const styles = {
     marginBottom: '16px',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
+    gap: '8px',
+    '@media (max-width: 640px)': {
+      padding: '10px',
+      fontSize: '13px',
+    }
   }
 }
 
@@ -326,12 +386,40 @@ const generateDummyData = () => {
   }
 }
 
+// カスタムフック: 画面サイズ検出
+const useWindowSize = () => {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      })
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  return {
+    ...windowSize,
+    isMobile: windowSize.width < BREAKPOINTS.mobile,
+    isTablet: windowSize.width >= BREAKPOINTS.mobile && windowSize.width < BREAKPOINTS.tablet,
+    isDesktop: windowSize.width >= BREAKPOINTS.desktop,
+  }
+}
+
 export default function ImprovedAnalyticsPage() {
+  const { isMobile, isTablet, isDesktop } = useWindowSize()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
   // Simple navigation function for demo purposes
   const navigate = (path: string) => {
     console.log(`Navigating to: ${path}`)
-    // In a real app, you would use React Router or similar
-    // For now, we'll just log the navigation
     window.location.hash = path
   }
   
@@ -364,47 +452,74 @@ export default function ImprovedAnalyticsPage() {
 
   const renderDataQualityBadge = (quality: string) => {
     const config = DATA_QUALITY_CONFIG[quality as keyof typeof DATA_QUALITY_CONFIG] || DATA_QUALITY_CONFIG.low
+    const badgeStyle = {
+      ...styles.badge,
+      background: config.bg,
+      color: config.color,
+    }
+    
+    if (isMobile) {
+      badgeStyle.padding = '3px 10px'
+      badgeStyle.fontSize = '11px'
+    }
     
     return (
-      <span style={{
-        ...styles.badge,
-        background: config.bg,
-        color: config.color,
-      }}>
-        <Info size={14} />
+      <span style={badgeStyle}>
+        <Info size={isMobile ? 12 : 14} />
         {config.label}
       </span>
     )
   }
 
-  const renderEmptyState = (title: string, description: string, actionLabel?: string, actionPath?: string) => (
-    <div style={styles.emptyState}>
-      <AlertCircle style={{ color: '#9ca3af', marginBottom: '16px' }} size={48} />
-      <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
-        {title}
-      </h3>
-      <p style={{ color: '#6b7280', marginBottom: '24px', maxWidth: '500px', fontSize: '14px' }}>
-        {description}
-      </p>
-      {actionLabel && actionPath && (
-        <button
-          onClick={() => navigate(actionPath)}
-          style={styles.primaryButton}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
-          }}
-        >
-          {actionLabel}
-          <ChevronRight size={16} />
-        </button>
-      )}
-    </div>
-  )
+  const renderEmptyState = (title: string, description: string, actionLabel?: string, actionPath?: string) => {
+    const emptyStyle = { ...styles.emptyState }
+    if (isMobile) {
+      emptyStyle.padding = '32px 16px'
+    }
+    
+    return (
+      <div style={emptyStyle}>
+        <AlertCircle style={{ color: '#9ca3af', marginBottom: '16px' }} size={isMobile ? 40 : 48} />
+        <h3 style={{ 
+          fontSize: isMobile ? '18px' : '20px', 
+          fontWeight: '600', 
+          color: '#1f2937', 
+          marginBottom: '8px' 
+        }}>
+          {title}
+        </h3>
+        <p style={{ 
+          color: '#6b7280', 
+          marginBottom: '24px', 
+          maxWidth: '500px', 
+          fontSize: isMobile ? '13px' : '14px' 
+        }}>
+          {description}
+        </p>
+        {actionLabel && actionPath && (
+          <button
+            onClick={() => navigate(actionPath)}
+            style={{
+              ...styles.primaryButton,
+              padding: isMobile ? '8px 16px' : '10px 20px',
+              fontSize: isMobile ? '13px' : '14px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
+            }}
+          >
+            {actionLabel}
+            <ChevronRight size={16} />
+          </button>
+        )}
+      </div>
+    )
+  }
 
   const renderMetricCard = (
     title: string, 
@@ -416,20 +531,26 @@ export default function ImprovedAnalyticsPage() {
     progress: number | null = null
   ) => {
     const Icon = icon
+    const cardStyle = {
+      ...styles.metricCard.base,
+      background: hasData ? gradient : styles.metricCard.gradients.gray,
+    }
+    
+    if (isMobile) {
+      cardStyle.padding = '16px'
+      cardStyle.borderRadius = '12px'
+    }
+    
     return (
       <div 
-        style={{
-          ...styles.metricCard.base,
-          background: hasData ? gradient : styles.metricCard.gradients.gray,
-        }}
+        style={cardStyle}
         onMouseEnter={(e) => {
           if (hasData) {
             Object.assign(e.currentTarget.style, styles.metricCard.hover);
           }
         }}
         onMouseLeave={(e) => {
-          Object.assign(e.currentTarget.style, styles.metricCard.base);
-          e.currentTarget.style.background = hasData ? gradient : styles.metricCard.gradients.gray;
+          Object.assign(e.currentTarget.style, cardStyle);
         }}
       >
         <div style={{
@@ -443,9 +564,9 @@ export default function ImprovedAnalyticsPage() {
         }} />
         
         <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between' }}>
-          <div>
+          <div style={{ flex: 1 }}>
             <p style={{
-              fontSize: '14px',
+              fontSize: isMobile ? '13px' : '14px',
               fontWeight: '500',
               color: hasData ? 'rgba(255, 255, 255, 0.9)' : '#6b7280',
               marginBottom: '4px'
@@ -453,7 +574,7 @@ export default function ImprovedAnalyticsPage() {
               {title}
             </p>
             <p style={{
-              fontSize: '28px',
+              fontSize: isMobile ? '20px' : '28px',
               fontWeight: 'bold',
               color: hasData ? 'white' : '#9ca3af'
             }}>
@@ -461,7 +582,7 @@ export default function ImprovedAnalyticsPage() {
             </p>
             {subtitle && (
               <p style={{
-                fontSize: '12px',
+                fontSize: isMobile ? '11px' : '12px',
                 color: hasData ? 'rgba(255, 255, 255, 0.8)' : '#6b7280',
                 marginTop: '4px'
               }}>
@@ -486,11 +607,11 @@ export default function ImprovedAnalyticsPage() {
             )}
           </div>
           <div style={{
-            padding: '12px',
+            padding: isMobile ? '10px' : '12px',
             borderRadius: '10px',
             background: hasData ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb'
           }}>
-            <Icon size={24} style={{ color: hasData ? 'white' : '#9ca3af' }} />
+            <Icon size={isMobile ? 20 : 24} style={{ color: hasData ? 'white' : '#9ca3af' }} />
           </div>
         </div>
       </div>
@@ -529,140 +650,320 @@ export default function ImprovedAnalyticsPage() {
             transform: rotate(360deg);
           }
         }
+        
+        @media (max-width: 640px) {
+          .hide-mobile { display: none !important; }
+        }
       `}</style>
 
       {/* ヘッダー */}
       <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div style={styles.headerTitle}>
-              <div style={styles.headerIcon}>
-                <BarChart3 size={24} />
-              </div>
-              <div>
-                <h1 style={styles.title}>
-                  学習分析
-                </h1>
-              </div>
-            </div>
-            
-            <button
-              style={styles.primaryButton}
-              onClick={() => navigate('/analytics/mock-exam')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
-              }}
-            >
-              <Plus size={16} />
-              模試追加
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '16px', alignItems: 'center' }}>
-            {/* ユーザーレベル */}
-            <div style={{ ...styles.levelCard, marginBottom: 0, minWidth: '200px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{
+          ...styles.headerContent,
+          padding: isMobile ? '12px 16px' : '16px 24px',
+        }}>
+          {/* モバイル用ヘッダー */}
+          {isMobile ? (
+            <>
+              {/* 上段: タイトルとメニューボタン */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
+                    ...styles.headerIcon,
                     padding: '8px',
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                    borderRadius: '8px',
-                    color: 'white',
                   }}>
-                    <Activity size={20} />
+                    <BarChart3 size={20} />
                   </div>
-                  <div>
-                    <p style={{ fontSize: '12px', color: '#6b7280' }}>学習レベル</p>
-                    <p style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
-                      {userLevel === 'advanced' ? '上級者' :
-                       userLevel === 'intermediate' ? '中級者' : '初級者'}
-                    </p>
-                  </div>
+                  <h1 style={{
+                    ...styles.title,
+                    fontSize: '20px',
+                  }}>
+                    学習分析
+                  </h1>
                 </div>
-                <Target size={20} style={{ color: '#6b7280' }} />
-              </div>
-            </div>
-
-            {/* 期間選択 */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              {dateRanges.map(range => (
+                
                 <button
-                  key={range.value}
-                  onClick={() => setDateRange(range.value)}
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   style={{
-                    ...styles.dateRangeButton.base,
-                    ...(dateRange === range.value ? styles.dateRangeButton.active : styles.dateRangeButton.inactive),
-                  }}
-                  onMouseEnter={(e) => {
-                    if (dateRange !== range.value) {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (dateRange !== range.value) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }
+                    padding: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
                   }}
                 >
-                  {range.label}
+                  {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
-              ))}
-            </div>
+              </div>
 
-            {/* タブ */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              {tabs.map(tab => {
-                const Icon = tab.icon
-                const isActive = activeTab === tab.id
-                
-                return (
+              {/* モバイルメニュー */}
+              {mobileMenuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'white',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  padding: '16px',
+                  zIndex: 50,
+                }}>
+                  {/* ユーザーレベル */}
+                  <div style={{
+                    ...styles.levelCard,
+                    marginBottom: '12px',
+                    padding: '12px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        padding: '6px',
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                        borderRadius: '6px',
+                        color: 'white',
+                      }}>
+                        <Activity size={16} />
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '11px', color: '#6b7280' }}>学習レベル</p>
+                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                          {userLevel === 'advanced' ? '上級者' :
+                           userLevel === 'intermediate' ? '中級者' : '初級者'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 模試追加ボタン */}
                   <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
                     style={{
-                      ...styles.tabButton.base,
-                      ...(isActive ? styles.tabButton.active : styles.tabButton.inactive),
+                      ...styles.primaryButton,
+                      width: '100%',
+                      padding: '10px',
+                      fontSize: '14px',
+                      marginBottom: '12px',
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }
+                    onClick={() => {
+                      navigate('/analytics/mock-exam')
+                      setMobileMenuOpen(false)
                     }}
                   >
-                    <Icon size={16} />
-                    <span>{tab.label}</span>
+                    <Plus size={16} />
+                    模試追加
                   </button>
-                )
-              })}
-            </div>
-          </div>
+
+                  {/* タブ */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px',
+                    marginBottom: '12px'
+                  }}>
+                    {tabs.map(tab => {
+                      const Icon = tab.icon
+                      const isActive = activeTab === tab.id
+                      
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            setActiveTab(tab.id)
+                            setMobileMenuOpen(false)
+                          }}
+                          style={{
+                            ...styles.tabButton.base,
+                            ...(isActive ? styles.tabButton.active : styles.tabButton.inactive),
+                            padding: '8px 12px',
+                            fontSize: '13px',
+                          }}
+                        >
+                          <Icon size={14} />
+                          <span>{tab.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* 期間選択 */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '8px'
+                  }}>
+                    {dateRanges.map(range => (
+                      <button
+                        key={range.value}
+                        onClick={() => {
+                          setDateRange(range.value)
+                          setMobileMenuOpen(false)
+                        }}
+                        style={{
+                          ...styles.dateRangeButton.base,
+                          ...(dateRange === range.value ? styles.dateRangeButton.active : styles.dateRangeButton.inactive),
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 下段: 現在のタブと期間 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                fontSize: '13px',
+                color: '#6b7280'
+              }}>
+                <span>{tabs.find(t => t.id === activeTab)?.label} • {dateRanges.find(r => r.value === dateRange)?.label}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* デスクトップ版ヘッダー */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={styles.headerTitle}>
+                  <div style={styles.headerIcon}>
+                    <BarChart3 size={24} />
+                  </div>
+                  <div>
+                    <h1 style={styles.title}>
+                      学習分析
+                    </h1>
+                  </div>
+                </div>
+                
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => navigate('/analytics/mock-exam')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
+                  }}
+                >
+                  <Plus size={16} />
+                  模試追加
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '16px', alignItems: 'center' }}>
+                {/* ユーザーレベル */}
+                <div style={{ ...styles.levelCard, marginBottom: 0, minWidth: '200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        padding: '8px',
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                        borderRadius: '8px',
+                        color: 'white',
+                      }}>
+                        <Activity size={20} />
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '12px', color: '#6b7280' }}>学習レベル</p>
+                        <p style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                          {userLevel === 'advanced' ? '上級者' :
+                           userLevel === 'intermediate' ? '中級者' : '初級者'}
+                        </p>
+                      </div>
+                    </div>
+                    <Target size={20} style={{ color: '#6b7280' }} />
+                  </div>
+                </div>
+
+                {/* 期間選択 */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {dateRanges.map(range => (
+                    <button
+                      key={range.value}
+                      onClick={() => setDateRange(range.value)}
+                      style={{
+                        ...styles.dateRangeButton.base,
+                        ...(dateRange === range.value ? styles.dateRangeButton.active : styles.dateRangeButton.inactive),
+                      }}
+                      onMouseEnter={(e) => {
+                        if (dateRange !== range.value) {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (dateRange !== range.value) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* タブ */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  {tabs.map(tab => {
+                    const Icon = tab.icon
+                    const isActive = activeTab === tab.id
+                    
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        style={{
+                          ...styles.tabButton.base,
+                          ...(isActive ? styles.tabButton.active : styles.tabButton.inactive),
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        <Icon size={16} />
+                        <span>{tab.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* メインコンテンツ */}
-      <div style={styles.mainContent}>
+      <div style={{
+        ...styles.mainContent,
+        padding: isMobile ? '16px' : '24px',
+      }}>
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div style={{ animation: 'fadeIn 0.3s ease' }}>
             {/* メトリックカード */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '16px',
+              gridTemplateColumns: isMobile ? '1fr' : 
+                                   isTablet ? 'repeat(2, 1fr)' : 
+                                   'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: isMobile ? '12px' : '16px',
               marginBottom: '24px'
             }}>
               {renderMetricCard(
@@ -708,25 +1009,32 @@ export default function ImprovedAnalyticsPage() {
             </div>
 
             {/* チャートセクション */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '16px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))', 
+              gap: '16px' 
+            }}>
               {/* 週間学習時間推移 */}
-              <div style={styles.chartCard}>
+              <div style={{
+                ...styles.chartCard,
+                padding: isMobile ? '16px' : '24px',
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart3 size={20} style={{ color: '#6366f1' }} />
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
+                    <BarChart3 size={isMobile ? 18 : 20} style={{ color: '#6366f1' }} />
+                    <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '600', color: '#1f2937' }}>
                       週間学習時間
                     </h3>
                   </div>
                   {data?.studyTimeStats?.hasData && (
-                    <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    <span style={{ fontSize: isMobile ? '12px' : '14px', color: '#6b7280' }}>
                       計: {data.studyTimeStats.weeklyTotal.toFixed(1)}h
                     </span>
                   )}
                 </div>
                 
                 {data?.studyTimeStats?.hasData ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
                     <AreaChart data={data.studyTimeStats.weeklyTrend}>
                       <defs>
                         <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
@@ -735,14 +1043,14 @@ export default function ImprovedAnalyticsPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
-                      <YAxis stroke="#6b7280" fontSize={12} />
+                      <XAxis dataKey="date" stroke="#6b7280" fontSize={isMobile ? 10 : 12} />
+                      <YAxis stroke="#6b7280" fontSize={isMobile ? 10 : 12} />
                       <Tooltip 
                         contentStyle={{
                           backgroundColor: 'white',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px',
-                          fontSize: '12px'
+                          fontSize: isMobile ? '11px' : '12px'
                         }}
                       />
                       <Area 
@@ -765,11 +1073,14 @@ export default function ImprovedAnalyticsPage() {
               </div>
 
               {/* 弱点トップ5 */}
-              <div style={styles.chartCard}>
+              <div style={{
+                ...styles.chartCard,
+                padding: isMobile ? '16px' : '24px',
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertCircle size={20} style={{ color: '#ef4444' }} />
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
+                    <AlertCircle size={isMobile ? 18 : 20} style={{ color: '#ef4444' }} />
+                    <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '600', color: '#1f2937' }}>
                       弱点トップ5
                     </h3>
                   </div>
@@ -780,25 +1091,31 @@ export default function ImprovedAnalyticsPage() {
                     data.weaknessData.slice(0, 5).map((weakness: any, index: number) => (
                       <div 
                         key={index} 
-                        style={styles.weaknessCard.base}
+                        style={{
+                          ...styles.weaknessCard.base,
+                          padding: isMobile ? '12px' : '16px',
+                        }}
                         onMouseEnter={(e) => {
                           Object.assign(e.currentTarget.style, styles.weaknessCard.hover);
                         }}
                         onMouseLeave={(e) => {
-                          Object.assign(e.currentTarget.style, styles.weaknessCard.base);
+                          Object.assign(e.currentTarget.style, {
+                            ...styles.weaknessCard.base,
+                            padding: isMobile ? '12px' : '16px',
+                          });
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                            <span style={{ fontSize: isMobile ? '13px' : '14px', fontWeight: '600', color: '#1f2937' }}>
                               {weakness.subject}
                             </span>
-                            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                            <span style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280' }}>
                               {weakness.unit}
                             </span>
                           </div>
                           <span style={{
-                            fontSize: '14px',
+                            fontSize: isMobile ? '13px' : '14px',
                             fontWeight: 'bold',
                             color: weakness.accuracy < 50 ? '#ef4444' :
                                    weakness.accuracy < 70 ? '#f59e0b' : '#10b981'
@@ -841,27 +1158,47 @@ export default function ImprovedAnalyticsPage() {
         {/* 弱点分析タブ */}
         {activeTab === 'weakness' && (
           <div style={{ animation: 'fadeIn 0.3s ease' }}>
-            <div style={styles.mainCard}>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
+            <div style={{
+              ...styles.mainCard,
+              padding: isMobile ? '16px' : '24px',
+            }}>
+              <h3 style={{ 
+                fontSize: isMobile ? '18px' : '20px', 
+                fontWeight: '600', 
+                color: '#1f2937', 
+                marginBottom: '16px' 
+              }}>
                 弱点分析結果
               </h3>
               
               {data?.weaknessData?.length > 0 ? (
                 <>
-                  <div style={{ display: 'flex', gap: '16px', color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '16px', 
+                    color: '#6b7280', 
+                    fontSize: isMobile ? '13px' : '14px', 
+                    marginBottom: '24px' 
+                  }}>
                     <span>検出: {data.weaknessData.length}件</span>
                     <span>•</span>
                     <span>期間: 30日間</span>
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: isMobile ? '1fr' : 
+                                       isTablet ? 'repeat(2, 1fr)' : 
+                                       'repeat(auto-fill, minmax(350px, 1fr))', 
+                    gap: '16px' 
+                  }}>
                     {data.weaknessData.map((weakness: any, index: number) => (
                       <div 
                         key={index}
                         style={{
                           borderRadius: '12px',
                           border: '1px solid #e5e7eb',
-                          padding: '20px',
+                          padding: isMobile ? '16px' : '20px',
                           transition: 'all 0.3s ease',
                         }}
                         onMouseEnter={(e) => {
@@ -873,12 +1210,25 @@ export default function ImprovedAnalyticsPage() {
                           e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'start', 
+                          justifyContent: 'space-between', 
+                          marginBottom: '12px' 
+                        }}>
                           <div>
-                            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                            <h4 style={{ 
+                              fontSize: isMobile ? '15px' : '16px', 
+                              fontWeight: '600', 
+                              color: '#1f2937' 
+                            }}>
                               {weakness.subject} - {weakness.unit}
                             </h4>
-                            <p style={{ marginTop: '4px', fontSize: '13px', color: '#6b7280' }}>
+                            <p style={{ 
+                              marginTop: '4px', 
+                              fontSize: isMobile ? '12px' : '13px', 
+                              color: '#6b7280' 
+                            }}>
                               正答率: {Math.round(weakness.accuracy)}% | 
                               問題数: {weakness.totalQuestions}問
                             </p>
@@ -889,11 +1239,11 @@ export default function ImprovedAnalyticsPage() {
                         <button
                           style={{
                             width: '100%',
-                            padding: '10px 16px',
+                            padding: isMobile ? '8px 14px' : '10px 16px',
                             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                             color: 'white',
                             borderRadius: '8px',
-                            fontSize: '14px',
+                            fontSize: isMobile ? '13px' : '14px',
                             fontWeight: '500',
                             border: 'none',
                             cursor: 'pointer',
