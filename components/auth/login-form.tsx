@@ -7,7 +7,6 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase/config'
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
-import { checkSubscription } from '@/lib/subscription/check-subscription'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, Mail, Lock, AlertCircle, Eye, EyeOff, ArrowRight } from 'lucide-react'
 
@@ -23,7 +22,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // リダイレクト先を取得（サブスクチェック後に使用）
+  // リダイレクト先を取得
   const intendedRedirect = searchParams.get('redirect') || '/home'
 
   // レスポンシブ対応
@@ -36,7 +35,7 @@ export function LoginForm() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // スタイル定義（CorporateActivationPageと統一）
+  // スタイル定義（変更なし）
   const styles = {
     form: {
       display: 'flex',
@@ -190,37 +189,15 @@ export function LoginForm() {
         console.error('最終ログイン更新エラー:', error)
       }
       
-      // サブスクリプション状態を確認
-      console.log('サブスクリプション状態を確認中...')
-      let active = false;
-      try {
-        const result = await checkSubscription(user.uid);
-        active = result.active;
-      } catch (error) {
-        console.error('サブスクリプション確認エラー:', error);
-        active = false;
-      }
+      // 決済システムを削除したため、直接ホーム画面へ遷移
+      console.log('ホーム画面へリダイレクト:', intendedRedirect)
+      toast({
+        title: 'ログインしました',
+        description: 'ホーム画面へ移動します',
+      })
       
-      if (active) {
-        // サブスクリプションがある場合は本来の遷移先へ
-        console.log('サブスクリプション確認済み。リダイレクト先:', intendedRedirect)
-        toast({
-          title: 'ログインしました',
-          description: 'ダッシュボードへ移動します',
-        })
-        // 強制的にページを再読み込みして認証状態を確実に反映
-        window.location.href = `https://a-istudy-highschool.vercel.app${intendedRedirect}`
-      } else {
-        // サブスクリプションがない場合は料金プランページへ
-        console.log('サブスクリプションなし。料金プランページへ遷移')
-        toast({
-          title: 'ログインしました',
-          description: 'ご利用にはプランの登録が必要です',
-          variant: 'default',
-        })
-        // 元の遷移先を保持してプランページへ
-        window.location.href = `https://a-istudy-highschool.vercel.app/subscription/register?redirect=${encodeURIComponent(intendedRedirect)}`
-      }
+      // 強制的にページを再読み込みして認証状態を確実に反映
+      window.location.href = intendedRedirect
       
     } catch (err: any) {
       console.error('Login error:', err)
@@ -249,12 +226,7 @@ export function LoginForm() {
           setError('ログイン試行回数が多すぎます。しばらくしてからお試しください')
           break
         default:
-          // サブスクリプションチェックのエラーの場合
-          if (err.message && err.message.includes('subscription')) {
-            setError('サブスクリプションの確認中にエラーが発生しました')
-          } else {
-            setError('ログインに失敗しました: ' + (err.message || '不明なエラー'))
-          }
+          setError('ログインに失敗しました: ' + (err.message || '不明なエラー'))
       }
     } finally {
       setLoading(false)
