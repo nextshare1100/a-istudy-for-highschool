@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, GripVertical } from 'lucide-react';
+import { CheckCircle, GripVertical, FileText, Languages } from 'lucide-react';
 
 interface Problem {
   id: string;
@@ -13,6 +13,10 @@ interface Problem {
   format?: string;
   requiredCount?: number;
   unnecessaryOptions?: string[];
+  passageText?: string;
+  passageTitle?: string;
+  targetWord?: string;
+  vocabularyType?: string;
 }
 
 interface AnswerFormProps {
@@ -28,11 +32,24 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [draggedFromIndex, setDraggedFromIndex] = useState<number | null>(null);
 
+  // 問題タイプの正規化
+  const normalizeType = (type: string): string => {
+    // 旧形式との互換性
+    const typeMap: { [key: string]: string } = {
+      'multiple-choice': 'multiple_choice',
+      'formula-fill': 'fill_in_blank',
+      'solution-order': 'solution_sequence',
+    };
+    return typeMap[type] || type;
+  };
+
   // 問題タイプに応じて初期化
   useEffect(() => {
     if (!problem) return;
 
-    switch (problem.type) {
+    const problemType = normalizeType(problem.type);
+
+    switch (problemType) {
       case 'solution_sequence':
       case 'sentence_sequence':
       case 'event_sequence':
@@ -61,7 +78,8 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
         break;
       
       case 'fill_in_blank':
-        const blanks = (problem.question.match(/\(\)/g) || []).length;
+        // 問題文内の空欄を検出
+        const blanks = (problem.question.match(/____|\(\)|\□/g) || []).length;
         setFillInAnswers(new Array(blanks).fill(''));
         break;
       
@@ -74,8 +92,10 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const problemType = normalizeType(problem.type);
     let submitAnswer;
-    switch (problem.type) {
+    
+    switch (problemType) {
       case 'solution_sequence':
       case 'sentence_sequence':
       case 'event_sequence':
@@ -86,6 +106,17 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
         submitAnswer = fillInAnswers;
         break;
       
+      case 'multiple_choice':
+      case 'reading_comprehension':
+      case 'vocabulary':
+        submitAnswer = answer;
+        break;
+        
+      case 'descriptive':
+      case 'essay':
+        submitAnswer = answer;
+        break;
+      
       default:
         submitAnswer = answer;
     }
@@ -93,12 +124,57 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
     onSubmit(submitAnswer);
   };
 
+  // 長文読解の文章表示
+  const renderPassage = () => {
+    if (!problem.passageText) return null;
+    
+    return (
+      <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="flex items-center gap-2 mb-3">
+          <FileText className="text-blue-500" size={20} />
+          <h4 className="font-bold text-gray-700">
+            {problem.passageTitle || '文章'}
+          </h4>
+        </div>
+        <div className="text-gray-700 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
+          {problem.passageText}
+        </div>
+      </div>
+    );
+  };
+
   // 回答入力部分のレンダリング
   const renderAnswerInput = () => {
-    switch (problem.type) {
+    const problemType = normalizeType(problem.type);
+
+    switch (problemType) {
       case 'multiple_choice':
+      case 'reading_comprehension':
+      case 'vocabulary':
         return (
           <div className="space-y-3">
+            {/* 語彙問題の対象単語表示 */}
+            {problemType === 'vocabulary' && problem.targetWord && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2">
+                  <Languages className="text-blue-600" size={16} />
+                  <span className="text-sm text-blue-700 font-medium">
+                    対象: <span className="font-bold text-lg">{problem.targetWord}</span>
+                    {problem.vocabularyType && (
+                      <span className="ml-2 text-xs">
+                        ({problem.vocabularyType === 'kanji' ? '漢字' :
+                          problem.vocabularyType === 'kobun' ? '古文' :
+                          problem.vocabularyType === 'kanbun' ? '漢文' :
+                          problem.vocabularyType === 'english_word' ? '英単語' :
+                          problem.vocabularyType === 'english_idiom' ? '英熟語' : 
+                          problem.vocabularyType})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {problem.options?.map((option, index) => (
               <label
                 key={index}
@@ -127,15 +203,19 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
         );
 
       case 'fill_in_blank':
-        const questionParts = problem.question.split('()');
+        // 複数の空欄パターンに対応
+        const blankPattern = /____|\(\)|\□/g;
+        const parts = problem.question.split(blankPattern);
+        const matches = problem.question.match(blankPattern) || [];
+        
         return (
           <div className="space-y-4">
             <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
               <p className="text-lg leading-relaxed">
-                {questionParts.map((part, index) => (
+                {parts.map((part, index) => (
                   <React.Fragment key={index}>
                     {part}
-                    {index < questionParts.length - 1 && (
+                    {index < matches.length && (
                       <span className="inline-block mx-1">
                         <input
                           type="text"
@@ -147,7 +227,7 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
                           }}
                           disabled={disabled}
                           className="inline-block w-32 px-3 py-1 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none text-center font-medium bg-white transition-colors"
-                          placeholder={`(${index + 1})`}
+                          placeholder={`空欄${index + 1}`}
                         />
                       </span>
                     )}
@@ -161,6 +241,7 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
           </div>
         );
 
+      case 'descriptive':
       case 'essay':
         return (
           <div className="space-y-3">
@@ -170,11 +251,21 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
               disabled={disabled}
               rows={8}
               className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-lg resize-none transition-colors bg-white"
-              placeholder="論述解答を入力してください（200-400字程度）"
+              placeholder={problemType === 'descriptive' 
+                ? "記述式解答を入力してください"
+                : "論述解答を入力してください（200-400字程度）"
+              }
             />
             <div className="flex justify-between text-sm text-gray-500">
-              <span>推奨: 200-400字</span>
-              <span className={answer.length > 400 ? 'text-orange-500' : ''}>{answer.length}文字</span>
+              {problemType === 'essay' && (
+                <>
+                  <span>推奨: 200-400字</span>
+                  <span className={answer.length > 400 ? 'text-orange-500' : ''}>{answer.length}文字</span>
+                </>
+              )}
+              {problemType === 'descriptive' && (
+                <span className="ml-auto">{answer.length}文字</span>
+              )}
             </div>
           </div>
         );
@@ -445,6 +536,9 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
             }}>
               <p style={{ color: '#1e40af', fontSize: '14px', textAlign: 'center', margin: '0' }}>
                 ドラッグ&ドロップで選択肢を正しい順序に並び替えてください
+                {problemType === 'sentence_sequence' && ' (文章の要素)'}
+                {problemType === 'event_sequence' && ' (出来事の順序)'}
+                {problemType === 'solution_sequence' && ' (解法の手順)'}
               </p>
             </div>
             
@@ -523,7 +617,8 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
       default:
         return (
           <div className="text-center text-gray-500 py-8">
-            この問題形式には対応していません
+            <p className="mb-2">この問題形式には対応していません</p>
+            <p className="text-sm">問題タイプ: {problem.type}</p>
           </div>
         );
     }
@@ -531,13 +626,23 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
 
   // 回答完了の判定
   const isAnswerComplete = () => {
-    switch (problem.type) {
+    const problemType = normalizeType(problem.type);
+
+    switch (problemType) {
       case 'multiple_choice':
+      case 'reading_comprehension':
+      case 'vocabulary':
         return answer !== '';
+        
       case 'fill_in_blank':
         return fillInAnswers.every(a => a.trim() !== '');
+        
+      case 'descriptive':
+        return answer.trim().length >= 10; // 最低10文字
+        
       case 'essay':
-        return answer.trim().length >= 50;
+        return answer.trim().length >= 50; // 最低50文字
+        
       case 'solution_sequence':
       case 'sentence_sequence':
       case 'event_sequence':
@@ -550,13 +655,19 @@ const AnswerForm: React.FC<AnswerFormProps> = ({ problem, onSubmit, disabled = f
           }
         }
         return selectedItems.length > 0;
+        
       default:
         return false;
     }
   };
 
+  const problemType = normalizeType(problem.type);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 長文読解の文章表示 */}
+      {problemType === 'reading_comprehension' && renderPassage()}
+      
       <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
         <h3 className="text-xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           解答
