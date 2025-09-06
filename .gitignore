@@ -1,44 +1,76 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
+_old_*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
 .DS_Store
+.env
+.env.development.local
+.env.local
+.env.production.local
+.env.test.local
+.env*
+.firebase/
+.idea/
+.next/
+.nyc_output
+.pnp
+.pnp.*
+.pnp.js
+.pnpm-debug.log*
+.vercel
+.vscode/
+.yarn/*
+*.backup
+*.bak
+*.bak2
+*.broken
+*.json
+*.old
 *.pem
-
+*.production
+*.swo
+*.swp
+*.tsbuildinfo
+/.next/
+/.pnp
+/build
+/coverage
+/node_modules
+/out/
+# Backups
 # debug
+# Debug
+# dependencies
+# Dependencies
+# Env files
+# env files (can opt-in for committing if needed)
+# Firebase
+# misc
+# Misc
+# next.js
+# Next.js
+# production
+# Production
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Supabase
+# testing
+# Testing
+# typescript
+# TypeScript
+# vercel
+# Vercel
+build/
+coverage/
+dist/
+firebase-debug.log
+next-env.d.ts
+node_modules/
 npm-debug.log*
+out/
+service-account-key.json
+supabase/.branches
+supabase/.temp
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-service-account-key.json
-*.json
-.env*
