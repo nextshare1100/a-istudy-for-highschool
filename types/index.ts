@@ -1,4 +1,4 @@
-// types/index.ts - 完全版
+// types/index.ts - 拡張版
 
 import { Timestamp } from 'firebase/firestore';
 
@@ -125,6 +125,17 @@ export interface CanvasConfig {
   };
 }
 
+// ========== 教育メタデータ（新規追加） ==========
+export interface EducationalMetadata {
+  bloomsTaxonomyLevel: string[];
+  prerequisiteTopics: string[];
+  estimatedSolvingTime: number;
+  cognitiveLoad: 'low' | 'medium' | 'high';
+  learningObjectives: string[];
+  skillsRequired: string[];
+}
+
+// ========== 拡張された問題型定義 ==========
 export interface Problem {
   id: string;
   subject: string;
@@ -155,8 +166,18 @@ export interface Problem {
   avgCorrectRate: number;
   createdAt: Timestamp;
   
-  // Canvas設定を追加
+  // Canvas設定
   canvasConfig?: CanvasConfig;
+  
+  // 拡張フィールド（新規追加）
+  generationParameters?: any; // ExtendedParameters from gemini.ts
+  validationResults?: any; // ValidationChecks from gemini.ts
+  educationalMetadata?: EducationalMetadata;
+  generationHistory?: Array<{
+    timestamp: Timestamp;
+    parameters: any;
+    version: number;
+  }>;
 }
 
 export type ProblemType = 

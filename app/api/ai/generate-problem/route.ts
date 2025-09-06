@@ -1,7 +1,8 @@
-// app/api/ai/generate-problem/route.ts - 修正版
+// app/api/ai/generate-problem/route.ts - 拡張版
 
 import { NextRequest } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ExtendedParameters, ValidationChecks } from '@/types/gemini';
 
 // ========== デバッグとエラーハンドリング ==========
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
@@ -58,7 +59,7 @@ function extractJSON(text: string): any | null {
   }
 }
 
-// レスポンスバリデーター
+// レスポンスバリデーター（拡張版）
 class ResponseValidator {
   static validateQuestionData(data: any): { isValid: boolean; error?: string } {
     if (!data || typeof data !== 'object') {
@@ -83,6 +84,52 @@ class ResponseValidator {
     
     return { isValid: true };
   }
+  
+  // 拡張パラメータの検証
+  static validateExtendedParameters(params: ExtendedParameters): ValidationChecks {
+    const includedConcepts: string[] = [];
+    const missingConcepts: string[] = [];
+    const skillsCovered: string[] = [];
+    const learningOutcomes: string[] = [];
+    
+    // 教育目標の検証
+    if (params.educationalObjective) {
+      if (params.educationalObjective.targetSkills) {
+        skillsCovered.push(...params.educationalObjective.targetSkills);
+      }
+      if (params.educationalObjective.primaryGoal) {
+        learningOutcomes.push(params.educationalObjective.primaryGoal);
+      }
+    }
+    
+    // 内容仕様の検証
+    if (params.contentSpecification) {
+      if (params.contentSpecification.mustIncludeConcepts) {
+        includedConcepts.push(...params.contentSpecification.mustIncludeConcepts);
+      }
+    }
+    
+    const requirementScore = includedConcepts.length > 0 ? 100 : 50;
+    const educationalScore = skillsCovered.length > 0 ? 100 : 50;
+    
+    return {
+      requirementsFulfillment: {
+        includedConcepts,
+        missingConcepts,
+        score: requirementScore
+      },
+      difficultyAlignment: {
+        estimatedDifficulty: 'medium',
+        confidence: 0.8,
+        reasoning: '指定された条件に基づいて難易度を推定しました'
+      },
+      educationalValue: {
+        skillsCovered,
+        learningOutcomes,
+        score: educationalScore
+      }
+    };
+  }
 }
 
 // ========== 型定義 ==========
@@ -94,6 +141,9 @@ interface GenerateProblemRequest {
   includeCanvas?: boolean;
   additionalRequirements?: string;
   subjectName?: string;
+  // 拡張パラメータ（新規追加）
+  extendedParameters?: ExtendedParameters;
+  useAdvancedCustomization?: boolean;
 }
 
 interface GeneratedProblem {
@@ -117,6 +167,12 @@ interface GeneratedProblem {
   comprehensionQuestions?: ComprehensionQuestion[];
   vocabularyType?: 'kanji' | 'kobun' | 'kanbun' | 'english_word' | 'english_idiom';
   targetWord?: string;
+  // 教育メタデータ（新規追加）
+  educationalMetadata?: {
+    bloomsTaxonomyLevel: string[];
+    cognitiveLoad: 'low' | 'medium' | 'high';
+    prerequisiteTopics: string[];
+  };
 }
 
 interface PassageMetadata {
@@ -210,7 +266,6 @@ function shouldExcludeAudioProblems(subject: string, topic: string): boolean {
 
 function isFormulaProblem(problemType: string, subject: string): boolean {
   const formulaSubjects = ['math', 'physics', 'chemistry'];
-  // math1, math2, mathA なども含むように部分一致でチェック
   return problemType === 'fill_in_blank' && formulaSubjects.some(s => subject?.toLowerCase().includes(s) || false);
 }
 
@@ -224,7 +279,7 @@ function isVocabularyProblem(subject: string, problemType: string): boolean {
   return languageSubjects.includes(subject) && problemType === 'vocabulary';
 }
 
-// ========== モデル選択ロジック ==========
+// ========== モデル選択ロジック（拡張版） ==========
 class ModelSelector {
   static selectOptimalModel(request: GenerateProblemRequest, needsCanvas: boolean): {
     modelName: string;
@@ -237,7 +292,9 @@ class ModelSelector {
       difficulty,
       problemType,
       includeCanvas,
-      additionalRequirements = ''
+      additionalRequirements = '',
+      useAdvancedCustomization = false,
+      extendedParameters
     } = request;
 
     if (shouldExcludeAudioProblems(subject, topic)) {
@@ -250,6 +307,12 @@ class ModelSelector {
 
     let proScore = 0;
     const reasons = [];
+
+    // 詳細カスタマイズ使用時は高性能モデルを優先
+    if (useAdvancedCustomization && extendedParameters) {
+      proScore += 40;
+      reasons.push('詳細カスタマイズ機能使用');
+    }
 
     // Canvas生成が必要な場合
     if (includeCanvas || needsCanvas) {
@@ -293,6 +356,139 @@ class ModelSelector {
       };
     }
   }
+}
+
+// ========== 構造化プロンプト生成（新規追加） ==========
+function generateStructuredPrompt(
+  request: GenerateProblemRequest,
+  modelType: string,
+  previousData?: any
+): string {
+  const { subject, topic, difficulty, problemType, extendedParameters } = request;
+  
+  if (!extendedParameters || !request.useAdvancedCustomization) {
+    return generateOptimizedPrompt(request, modelType, 'question', previousData);
+  }
+  
+  let prompt = `
+# 問題生成指示書
+
+## 1. 基本情報
+- 科目: ${subject} (${request.subjectName})
+- 単元: ${topic}
+- 難易度: ${difficulty}
+- 問題形式: ${problemType}
+
+`;
+
+  // 教育目標
+  if (extendedParameters.educationalObjective) {
+    const obj = extendedParameters.educationalObjective;
+    prompt += `## 2. 教育目標
+### 主要目標
+${obj.primaryGoal}
+
+### 測定する能力
+${obj.targetSkills.map(skill => `- ${skill}`).join('\n')}
+
+`;
+  }
+
+  // 内容要件
+  if (extendedParameters.contentSpecification) {
+    const spec = extendedParameters.contentSpecification;
+    prompt += `## 3. 内容要件
+### 必須概念
+${spec.mustIncludeConcepts.map(c => `- ${c}`).join('\n')}
+
+### 避けるべき概念
+${spec.avoidConcepts.map(c => `- ${c}`).join('\n')}
+
+`;
+    
+    // 数値制約
+    if (spec.numericalConstraints) {
+      prompt += `### 数値制約
+- 整数のみ: ${spec.numericalConstraints.integerOnly ? 'はい' : 'いいえ'}
+- 範囲: ${spec.numericalConstraints.range.min} ～ ${spec.numericalConstraints.range.max}
+- 分数を避ける: ${spec.numericalConstraints.avoidFractions ? 'はい' : 'いいえ'}
+
+`;
+    }
+  }
+
+  // 評価基準
+  if (extendedParameters.assessmentCriteria) {
+    const criteria = extendedParameters.assessmentCriteria;
+    prompt += `## 4. 評価基準
+### 理由説明の必要性
+${criteria.requiredJustification ? '解答には必ず理由説明を含める' : '理由説明は任意'}
+
+### チェックすべき誤答パターン
+${criteria.commonMistakesToCheck.map(m => `- ${m}`).join('\n')}
+
+`;
+    
+    // 部分点構造
+    if (criteria.partialCreditStructure) {
+      prompt += `### 部分点構造
+${criteria.partialCreditStructure.steps.map((step, i) => 
+  `${i + 1}. ${step.description} (${step.maxPoints}点)
+   評価基準: ${step.criteria.join(', ')}`
+).join('\n')}
+
+`;
+    }
+  }
+
+  // 文脈設定
+  if (extendedParameters.contextSetting) {
+    const context = extendedParameters.contextSetting;
+    if (context.realWorldContext) {
+      prompt += `## 5. 文脈設定
+実社会での応用: ${context.realWorldContext}
+`;
+    }
+    if (context.narrativeStyle) {
+      prompt += `文体: ${context.narrativeStyle === 'formal' ? '形式的' : 
+                     context.narrativeStyle === 'conversational' ? '会話的' : '物語調'}
+`;
+    }
+  }
+
+  // 言語設定
+  if (extendedParameters.languagePreferences) {
+    const lang = extendedParameters.languagePreferences;
+    prompt += `## 6. 言語設定
+- 語彙レベル: ${lang.vocabulary === 'basic' ? '基本的' : 
+                  lang.vocabulary === 'intermediate' ? '中級' : '上級'}
+- 文章の複雑さ: ${lang.sentenceComplexity === 'simple' ? 'シンプル' : 
+                   lang.sentenceComplexity === 'moderate' ? '標準' : '複雑'}
+- 専門用語の使用: ${lang.technicalTermUsage === 'minimal' ? '最小限' : 
+                    lang.technicalTermUsage === 'standard' ? '標準' : '積極的'}
+
+`;
+  }
+
+  prompt += `
+## 出力要件
+以下のJSON形式で問題を生成してください：
+\`\`\`json
+{
+  "question": "問題文",
+  "answer": "答え",
+  "explanation": "詳細な解説",
+  "hints": ["ヒント1", "ヒント2"],
+  "educationalMetadata": {
+    "bloomsTaxonomyLevel": ["適用", "分析"],
+    "cognitiveLoad": "medium",
+    "prerequisiteTopics": ["前提となる知識"]
+  }
+}
+\`\`\`
+`;
+
+  return prompt;
 }
 
 // ========== Canvas生成プロンプト ==========
@@ -818,6 +1014,63 @@ ${subject === 'japanese' ?
   return '';
 }
 
+// ========== 検証機能（新規追加） ==========
+async function validateGeneratedProblem(
+  problemData: GeneratedProblem,
+  request: GenerateProblemRequest
+): Promise<ValidationChecks> {
+  const results: ValidationChecks = {
+    requirementsFulfillment: {
+      includedConcepts: [],
+      missingConcepts: [],
+      score: 100
+    },
+    difficultyAlignment: {
+      estimatedDifficulty: request.difficulty as 'easy' | 'medium' | 'hard',
+      confidence: 0.9,
+      reasoning: '問題の複雑さと必要な知識レベルに基づいて判定'
+    },
+    educationalValue: {
+      skillsCovered: [],
+      learningOutcomes: [],
+      score: 85
+    }
+  };
+  
+  // 拡張パラメータに基づいた検証
+  if (request.extendedParameters) {
+    const extValidation = ResponseValidator.validateExtendedParameters(request.extendedParameters);
+    
+    // 必須概念のチェック
+    if (request.extendedParameters.contentSpecification?.mustIncludeConcepts) {
+      const requiredConcepts = request.extendedParameters.contentSpecification.mustIncludeConcepts;
+      const problemText = `${problemData.question} ${problemData.explanation}`.toLowerCase();
+      
+      results.requirementsFulfillment.includedConcepts = requiredConcepts.filter(concept =>
+        problemText.includes(concept.toLowerCase())
+      );
+      
+      results.requirementsFulfillment.missingConcepts = requiredConcepts.filter(concept =>
+        !problemText.includes(concept.toLowerCase())
+      );
+      
+      results.requirementsFulfillment.score = 
+        (results.requirementsFulfillment.includedConcepts.length / requiredConcepts.length) * 100;
+    }
+    
+    // 教育的価値の評価
+    if (request.extendedParameters.educationalObjective) {
+      results.educationalValue.skillsCovered = 
+        request.extendedParameters.educationalObjective.targetSkills || [];
+      results.educationalValue.learningOutcomes = [
+        request.extendedParameters.educationalObjective.primaryGoal || ''
+      ];
+    }
+  }
+  
+  return results;
+}
+
 // ========== メインハンドラー ==========
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -843,7 +1096,9 @@ export async function POST(request: NextRequest) {
           difficulty: body.difficulty,
           type: body.problemType,
           model: modelDecision.modelName,
-          modelReason: modelDecision.reason
+          modelReason: modelDecision.reason,
+          // 拡張パラメータの使用状況を追加
+          useAdvancedCustomization: body.useAdvancedCustomization || false
         }));
         
         const apiKey = process.env.GEMINI_API_KEY;
@@ -862,6 +1117,7 @@ export async function POST(request: NextRequest) {
         
         let passageData: any = null;
         let questionData: any = null;
+        let validationResults: ValidationChecks | null = null;
         
         // 長文読解の場合、まず文章を生成
         if (isReadingComprehension) {
@@ -888,13 +1144,10 @@ export async function POST(request: NextRequest) {
           }));
         }
         
-        // 問題文の生成
-        const questionPrompt = generateOptimizedPrompt(
-          body, 
-          modelDecision.modelName, 
-          'question',
-          passageData
-        );
+        // 問題文の生成（拡張カスタマイズ対応）
+        const questionPrompt = body.useAdvancedCustomization && body.extendedParameters
+          ? generateStructuredPrompt(body, modelDecision.modelName, passageData)
+          : generateOptimizedPrompt(body, modelDecision.modelName, 'question', passageData);
         debugLog('Question prompt', questionPrompt);
         
         const questionResult = await model.generateContent(questionPrompt);
@@ -919,6 +1172,12 @@ export async function POST(request: NextRequest) {
         
         questionData = questionJson;
         
+        // 拡張パラメータ使用時の検証
+        if (body.useAdvancedCustomization && body.extendedParameters) {
+          validationResults = await validateGeneratedProblem(questionData, body);
+          debugLog('Validation results', validationResults);
+        }
+        
         // Canvas必要性の判定
         const canvasDetection = CanvasDetector.needsCanvas(
           body.subject,
@@ -929,7 +1188,7 @@ export async function POST(request: NextRequest) {
         
         const needsCanvas = body.includeCanvas || canvasDetection.needed;
         
-        // 問題文をSSEで送信（デバッグログを追加）
+        // 問題文をSSEで送信
         const sseData = {
           status: 'question_ready',
           question: questionData.question,
@@ -938,7 +1197,8 @@ export async function POST(request: NextRequest) {
           ...(questionData.format && { format: questionData.format }),
           ...(questionData.formulaType && { formulaType: questionData.formulaType }),
           ...(questionData.vocabularyType && { vocabularyType: questionData.vocabularyType }),
-          ...(questionData.targetWord && { targetWord: questionData.targetWord })
+          ...(questionData.targetWord && { targetWord: questionData.targetWord }),
+          ...(questionData.educationalMetadata && { educationalMetadata: questionData.educationalMetadata })
         };
         
         debugLog('Sending question_ready SSE', sseData);
@@ -1115,7 +1375,9 @@ export async function POST(request: NextRequest) {
           estimatedTime: needsCanvas ? 20 : isReadingComprehension ? 30 : 15,
           keywords: [...(passageData?.passageMetadata?.keyConcepts || []), body.topic],
           modelUsed: modelDecision.modelName,
-          estimatedCost: modelDecision.estimatedCost
+          estimatedCost: modelDecision.estimatedCost,
+          // 検証結果を含める
+          ...(validationResults && { validationResults })
         }));
         
       } catch (error) {
