@@ -1,4 +1,4 @@
-// app/api/ai/generate-problem/route.ts - 拡張版
+// app/api/ai/generate-problem/route.ts - 修正版
 
 import { NextRequest } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -130,6 +130,50 @@ class ResponseValidator {
       }
     };
   }
+}
+
+// ========== 科目名の正規化 ==========
+function normalizeSubjectName(subjectKey: string, subjectName?: string): string {
+  const subjectNameMap: { [key: string]: string } = {
+    // 数学
+    'math1': '数学Ⅰ',
+    'mathA': '数学A',
+    'math2': '数学Ⅱ',
+    'mathB': '数学B',
+    'mathC': '数学C',
+    'math3': '数学Ⅲ',
+    
+    // 国語
+    'japanese': '国語',
+    
+    // 英語
+    'englishReading': '英語',
+    
+    // 理科
+    'physicsBase': '物理基礎',
+    'physics': '物理',
+    'chemistryBase': '化学基礎',
+    'chemistry': '化学',
+    'biologyBase': '生物基礎',
+    'biology': '生物',
+    'earthScienceBase': '地学基礎',
+    'earthScience': '地学',
+    
+    // 社会
+    'geographyComprehensive': '地理総合',
+    'geography': '地理探究',
+    'historyComprehensive': '歴史総合',
+    'japaneseHistory': '日本史探究',
+    'worldHistory': '世界史探究',
+    'civicsBase': '公共',
+    'ethics': '倫理',
+    'politicsEconomics': '政治・経済',
+    
+    // 情報
+    'information1': '情報Ⅰ'
+  };
+  
+  return subjectName || subjectNameMap[subjectKey] || subjectKey;
 }
 
 // ========== 型定義 ==========
@@ -270,12 +314,12 @@ function isFormulaProblem(problemType: string, subject: string): boolean {
 }
 
 function isReadingComprehensionProblem(subject: string, problemType: string): boolean {
-  const readingSubjects = ['japanese', 'english'];
+  const readingSubjects = ['japanese', 'englishReading'];
   return readingSubjects.includes(subject) && problemType === 'reading_comprehension';
 }
 
 function isVocabularyProblem(subject: string, problemType: string): boolean {
-  const languageSubjects = ['japanese', 'english'];
+  const languageSubjects = ['japanese', 'englishReading'];
   return languageSubjects.includes(subject) && problemType === 'vocabulary';
 }
 
@@ -366,6 +410,9 @@ function generateStructuredPrompt(
 ): string {
   const { subject, topic, difficulty, problemType, extendedParameters } = request;
   
+  // 科目名を正規化
+  const normalizedSubjectName = normalizeSubjectName(subject, request.subjectName);
+  
   if (!extendedParameters || !request.useAdvancedCustomization) {
     return generateOptimizedPrompt(request, modelType, 'question', previousData);
   }
@@ -374,10 +421,13 @@ function generateStructuredPrompt(
 # 問題生成指示書
 
 ## 1. 基本情報
-- 科目: ${subject} (${request.subjectName})
+- 科目: ${normalizedSubjectName}
 - 単元: ${topic}
 - 難易度: ${difficulty}
 - 問題形式: ${problemType}
+
+重要: 必ず指定された科目（${normalizedSubjectName}）の問題を作成してください。
+他の科目の問題は絶対に作成しないでください。
 
 `;
 
@@ -499,6 +549,9 @@ function generateCanvasPrompt(
 ): string {
   const { subject, topic, difficulty } = request;
   
+  // 科目名を正規化
+  const normalizedSubjectName = normalizeSubjectName(subject, request.subjectName);
+  
   // Canvas タイプ別の詳細なプロンプト
   const typeSpecificInstructions = {
     coordinate: `
@@ -537,7 +590,7 @@ function generateCanvasPrompt(
   return `
 【Canvas図形データの生成】
 問題: ${questionData.question}
-科目: ${subject}
+科目: ${normalizedSubjectName}
 単元: ${topic}
 難易度: ${difficulty}
 図形タイプ: ${canvasType}
@@ -672,6 +725,9 @@ function generateStandardPrompt(
 ): string {
   const { subject, topic, difficulty, problemType, additionalRequirements } = request;
   
+  // 科目名を正規化
+  const normalizedSubjectName = normalizeSubjectName(subject, request.subjectName);
+  
   const difficultyMap: { [key: string]: string } = {
     'easy': '基礎レベル（教科書の例題レベル）',
     'medium': '標準レベル（共通テストレベル）',
@@ -691,11 +747,13 @@ function generateStandardPrompt(
       if (['solution_sequence', 'sentence_sequence', 'event_sequence'].includes(problemType)) {
         return `
 【並び替え問題の作成】
-科目: ${subject}
+科目: ${normalizedSubjectName}
 単元: ${topic}
 難易度: ${difficultyMap[difficulty]}
 
-${topic}の${problemTypeInstructions[problemType]}を作成してください。
+${normalizedSubjectName}の${topic}の${problemTypeInstructions[problemType]}を作成してください。
+
+重要: 必ず指定された科目（${normalizedSubjectName}）の問題を作成してください。
 
 【超重要】問題文作成ルール：
 1. 問題文には絶対に選択肢（A, B, C...）を含めないこと
@@ -706,8 +764,16 @@ ${UNIFIED_JSON_FORMAT}`;
       }
       
       return `
-${topic}の${problemTypeInstructions[problemType] || problemType}を1つ作成してください。
+【問題作成指示】
+科目: ${normalizedSubjectName}
+単元: ${topic}
 難易度: ${difficultyMap[difficulty] || difficulty}
+問題形式: ${problemTypeInstructions[problemType] || problemType}
+
+上記の条件に厳密に従って、${normalizedSubjectName}の${topic}の問題を1つ作成してください。
+
+重要: 必ず指定された科目（${normalizedSubjectName}）の問題を作成してください。
+他の科目の問題は絶対に作成しないでください。
 
 ${additionalRequirements ? `追加要件: ${additionalRequirements}` : ''}
 ${specialInstructions}
@@ -787,6 +853,9 @@ function generateFormulaFillBlankPrompt(
 ): string {
   const { subject, topic, difficulty } = request;
   
+  // 科目名を正規化
+  const normalizedSubjectName = normalizeSubjectName(subject, request.subjectName);
+  
   const difficultyMap: { [key: string]: string } = {
     'easy': '基本的な公式（空欄1-2個）',
     'medium': '標準的な公式（空欄2-3個）',
@@ -797,12 +866,14 @@ function generateFormulaFillBlankPrompt(
     case 'question':
       return `
 【公式穴埋め問題の作成】
-科目: ${subject}
+科目: ${normalizedSubjectName}
 単元: ${topic}
 難易度: ${difficultyMap[difficulty]}
 
-${topic}で使用される重要な公式・定理・法則の穴埋め問題を作成してください。
+${normalizedSubjectName}の${topic}で使用される重要な公式・定理・法則の穴埋め問題を作成してください。
 空欄は「____」または「□」で表してください。
+
+重要: 必ず指定された科目（${normalizedSubjectName}）の公式を使用してください。
 
 ${UNIFIED_JSON_FORMAT}
 
@@ -857,17 +928,22 @@ function generateReadingComprehensionPrompt(
 ): string {
   const { subject, topic, difficulty } = request;
   
+  // 英語かどうかを明確に判定
+  const isEnglish = subject === 'englishReading';
+  const languageName = isEnglish ? '英語' : '日本語';
+  const subjectName = isEnglish ? '英語（English Reading）' : '国語';
+  
   const difficultySettings = {
     easy: {
-      passageLength: subject === 'japanese' ? '400-600字' : '200-300 words',
+      passageLength: isEnglish ? '200-300 words' : '400-600字',
       questionDepth: '基本的な内容理解'
     },
     medium: {
-      passageLength: subject === 'japanese' ? '600-900字' : '400-500 words',
+      passageLength: isEnglish ? '400-500 words' : '600-900字',
       questionDepth: '論理展開の理解'
     },
     hard: {
-      passageLength: subject === 'japanese' ? '900-1200字' : '600-700 words',
+      passageLength: isEnglish ? '600-700 words' : '900-1200字',
       questionDepth: '批判的思考'
     }
   };
@@ -878,23 +954,27 @@ function generateReadingComprehensionPrompt(
     case 'passage':
       return `
 【長文読解問題の作成】
-科目: ${subject === 'japanese' ? '国語' : '英語'}
+科目: ${subjectName}
+言語: ${languageName}
 単元: ${topic}
 難易度: ${difficulty}
 文章の長さ: ${settings.passageLength}
 
-${subject === 'japanese' ? '日本語' : '英語'}の文章を作成してください。
+必ず${languageName}の文章を作成してください。
+${isEnglish ? 'Write the passage entirely in English.' : '文章は日本語で書いてください。'}
+${isEnglish ? 'Do NOT write in Japanese.' : '英語は使用しないでください。'}
 
 出力形式（JSONのみ）:
 \`\`\`json
 {
-  "passageTitle": "文章のタイトル",
-  "passageText": "本文全体",
+  "passageTitle": "${isEnglish ? 'Title in English' : 'タイトルを日本語で'}",
+  "passageText": "${isEnglish ? 'Full passage text in English...' : '本文全体を日本語で...'}",
   "passageMetadata": {
-    "genre": "評論/essay/article",
-    "wordCount": 文字数,
-    "themes": ["テーマ1"],
-    "keyConcepts": ["重要概念1"]
+    "genre": "${isEnglish ? 'essay' : '評論'}",
+    "wordCount": ${isEnglish ? 'number of words' : '文字数'},
+    "themes": ["${isEnglish ? 'theme in English' : 'テーマを日本語で'}"],
+    "keyConcepts": ["${isEnglish ? 'concept in English' : '概念を日本語で'}"],
+    "language": "${languageName}"
   }
 }
 \`\`\``;
@@ -904,11 +984,13 @@ ${subject === 'japanese' ? '日本語' : '英語'}の文章を作成してくだ
 文章: ${previousData?.passageText}
 
 この文章に基づいて、${settings.questionDepth}を問う選択問題を作成してください。
+科目: ${subjectName}
+言語: ${languageName}で問題文を作成してください。
 
 出力形式（JSONのみ）:
 \`\`\`json
 {
-  "question": "問題文",
+  "question": "${isEnglish ? 'Question in English' : '問題文を日本語で'}",
   "questionType": "summary_choice" または "flow_sequence"
 }
 \`\`\``;
@@ -917,11 +999,12 @@ ${subject === 'japanese' ? '日本語' : '英語'}の文章を作成してくだ
       if (previousData?.questionType === 'flow_sequence') {
         return `
 文章の流れを要約した選択肢を作成してください。
+言語: ${languageName}で選択肢を作成してください。
 
 \`\`\`json
 {
   "format": "normal",
-  "options": ["段落1の要約", "段落2の要約", "段落3の要約", "段落4の要約"],
+  "options": ["${isEnglish ? 'Summary 1 in English' : '段落1の要約を日本語で'}", "${isEnglish ? 'Summary 2 in English' : '段落2の要約を日本語で'}", "${isEnglish ? 'Summary 3 in English' : '段落3の要約を日本語で'}", "${isEnglish ? 'Summary 4 in English' : '段落4の要約を日本語で'}"],
   "correctOrder": "正しい順序",
   "optionLabels": ["A", "B", "C", "D"]
 }
@@ -930,23 +1013,25 @@ ${subject === 'japanese' ? '日本語' : '英語'}の文章を作成してくだ
       
       return `
 内容要約の選択肢を4つ作成してください。
+言語: ${languageName}で選択肢を作成してください。
 
 \`\`\`json
 {
-  "options": ["要約1", "要約2", "要約3", "要約4"],
-  "answer": "最も適切な要約"
+  "options": ["${isEnglish ? 'Option 1 in English' : '要約1を日本語で'}", "${isEnglish ? 'Option 2 in English' : '要約2を日本語で'}", "${isEnglish ? 'Option 3 in English' : '要約3を日本語で'}", "${isEnglish ? 'Option 4 in English' : '要約4を日本語で'}"],
+  "answer": "${isEnglish ? 'The most appropriate summary in English' : '最も適切な要約を日本語で'}"
 }
 \`\`\``;
 
     case 'explanation':
       return `
 文章と問題に基づいて解説を作成してください。
+言語: ${languageName}で解説を作成してください。
 
 \`\`\`json
 {
-  "explanation": "なぜその選択肢が正解なのかの説明",
-  "keyPoints": ["理解すべきポイント1"],
-  "hints": ["文章の読み方のヒント"]
+  "explanation": "${isEnglish ? 'Explanation in English about why this is the correct answer' : 'なぜその選択肢が正解なのかの説明を日本語で'}",
+  "keyPoints": ["${isEnglish ? 'Key point in English' : '理解すべきポイントを日本語で'}"],
+  "hints": ["${isEnglish ? 'Reading tip in English' : '文章の読み方のヒントを日本語で'}"]
 }
 \`\`\``;
   }
@@ -962,25 +1047,31 @@ function generateVocabularyPrompt(
   previousData?: any
 ): string {
   const { subject, topic, difficulty } = request;
+  
+  // 英語かどうかを明確に判定
+  const isEnglish = subject === 'englishReading';
+  const subjectName = isEnglish ? '英語' : '国語';
 
   switch (stage) {
     case 'question':
       return `
 【語彙問題の作成】
-科目: ${subject === 'japanese' ? '国語' : '英語'}
+科目: ${subjectName}
 単元: ${topic}
 難易度: ${difficulty}
 
-${subject === 'japanese' ? 
-`共通テストでよく出る語彙問題を作成してください。` :
-`英語の語彙・熟語問題を作成してください。`}
+${isEnglish ? 
+`英語の語彙・熟語問題を作成してください。問題文は日本語で、対象となる英単語・熟語を含めてください。` :
+`共通テストでよく出る${topic}の語彙問題を作成してください。`}
+
+重要: 必ず${subjectName}の問題を作成してください。
 
 出力形式（JSONのみ）:
 \`\`\`json
 {
-  "question": "問題文",
-  "vocabularyType": "kanji/kobun/kanbun/word/idiom",
-  "targetWord": "対象となる語"
+  "question": "${isEnglish ? '次の英単語の意味として最も適切なものを選びなさい: [英単語]' : '問題文を日本語で'}",
+  "vocabularyType": "${isEnglish ? 'english_word' : 'kanji/kobun/kanbun'}",
+  "targetWord": "${isEnglish ? 'target English word' : '対象となる語'}"
 }
 \`\`\``;
 
@@ -988,8 +1079,10 @@ ${subject === 'japanese' ?
       return `
 問題: ${previousData?.question}
 語彙タイプ: ${previousData?.vocabularyType}
+科目: ${subjectName}
 
 適切な選択肢を4つ作成してください。
+${isEnglish ? '選択肢は日本語で作成してください。' : ''}
 
 \`\`\`json
 {
@@ -1001,6 +1094,7 @@ ${subject === 'japanese' ?
     case 'explanation':
       return `
 語彙問題の詳細な解説を作成してください。
+科目: ${subjectName}
 
 \`\`\`json
 {
@@ -1076,6 +1170,16 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   
   debugLog('Request received', body);
+  
+  // 科目名の正規化をデバッグ
+  debugLog('Normalized subject info', {
+    originalSubject: body.subject,
+    subjectName: body.subjectName,
+    normalizedName: normalizeSubjectName(body.subject, body.subjectName),
+    topic: body.topic,
+    isEnglish: body.subject === 'englishReading',
+    isJapanese: body.subject === 'japanese'
+  });
   
   const isReadingComprehension = isReadingComprehensionProblem(body.subject, body.problemType);
   
