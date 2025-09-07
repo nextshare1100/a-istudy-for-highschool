@@ -441,3 +441,7 @@ export async function saveTermsAgreement(userId: string, agreementData: any) {
 }
 
 // 問題管理関連の関数も必要であればここに追加
+
+// Ensure all exports are available
+export * from './firestore';
+
