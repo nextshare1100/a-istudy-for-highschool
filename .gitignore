@@ -74,3 +74,15 @@ supabase/.branches
 supabase/.temp
 yarn-debug.log*
 yarn-error.log*
+
+# 開発用スクリプト
+*.sh
+deps.dot
+
+# テスト設定
+jest.config.js
+jest.setup.js
+
+# 一時ファイル
+*.patch
+
