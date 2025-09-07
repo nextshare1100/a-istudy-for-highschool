@@ -679,9 +679,12 @@ export function StudyTimer({ subjects = [] }: StudyTimerProps) {
     try {
       // Firebase統合: セッション開始
       const result = await startTimerSessionWithContent(
-        selectedSubject,  // 科目ID（例：math1）
-        selectedUnit,     // 単元ID
-        content
+        user.uid,
+        {
+          subjectId: selectedSubject,
+          unitId: selectedUnit,
+          ...content
+        }
       )
       
       if (result.success && result.sessionId) {
@@ -732,7 +735,7 @@ export function StudyTimer({ subjects = [] }: StudyTimerProps) {
     
     setLoading(true)
     try {
-      const result = await toggleTimerPause(sessionId)
+      const result = await toggleTimerPause(sessionId, !isPaused)
       if (result.success) {
         if (!isPaused) {
           // 一時停止
@@ -766,7 +769,10 @@ export function StudyTimer({ subjects = [] }: StudyTimerProps) {
     
     setLoading(true)
     try {
-      const result = await recordBreak(sessionId)
+      const result = await recordBreak(sessionId, {
+        timestamp: Date.now(),
+        duration: 0
+      })
       if (result.success) {
         setBreaks(breaks + 1)
         toast({
