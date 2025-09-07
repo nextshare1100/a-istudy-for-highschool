@@ -81,4 +81,4 @@ export async function enableUser(uid: string) {
     console.error('ユーザー有効化エラー:', error)
     return { success: false, error: 'Failed to enable user' }
   }
-}
+}export const auth = adminAuth;

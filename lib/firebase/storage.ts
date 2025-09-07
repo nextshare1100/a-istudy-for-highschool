@@ -184,3 +184,13 @@ export class StorageService {
 }
 
 export const storageService = StorageService.getInstance();
+
+export async function deleteImage(path: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
+  } catch (error) {
+    console.error("Error deleting image:", error);
+    throw error;
+  }
+}

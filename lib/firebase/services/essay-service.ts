@@ -289,8 +289,8 @@ export const essayService = {
       });
       return true;
     }, 'updateEvaluation');
-  }
-};
+  },
+
   async getSubmission(submissionId: string): Promise<any | null> {
     try {
       const docRef = doc(db, 'essaySubmissions', submissionId);
@@ -307,9 +307,11 @@ export const essayService = {
       console.error('Error getting submission:', error);
       throw error;
     }
-  },
+  }
+};
 
-  async getEvaluation(evaluationId: string): Promise<any | null> {
+// Additional helper functions
+async function getEvaluation(evaluationId: string): Promise<any | null> {
     try {
       const docRef = doc(db, 'essayEvaluations', evaluationId);
       const docSnap = await getDoc(docRef);
@@ -325,9 +327,9 @@ export const essayService = {
       console.error('Error getting evaluation:', error);
       throw error;
     }
-  },
+  }
 
-  async saveEvaluation(evaluation: any): Promise<string> {
+async function saveEvaluation(evaluation: any): Promise<string> {
     try {
       const docRef = await addDoc(collection(db, 'essayEvaluations'), {
         ...evaluation,
@@ -340,9 +342,9 @@ export const essayService = {
       console.error('Error saving evaluation:', error);
       throw error;
     }
-  },
+  }
 
-  async updateSubmission(submissionId: string, data: any): Promise<void> {
+async function updateSubmission(submissionId: string, data: any): Promise<void> {
     try {
       const docRef = doc(db, 'essaySubmissions', submissionId);
       await updateDoc(docRef, {
@@ -353,4 +355,4 @@ export const essayService = {
       console.error('Error updating submission:', error);
       throw error;
     }
-  }
+};
