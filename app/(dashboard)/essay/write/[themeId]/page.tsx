@@ -905,7 +905,7 @@ export default function EssayWritePage({ params }: PageProps) {
       
       const idToken = await user.getIdToken();
 
-      const response = await fetch('/api/essay/evaluate', {
+      const response = await fetch('/api/essay/evaluate-advanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -913,7 +913,7 @@ export default function EssayWritePage({ params }: PageProps) {
         },
         body: JSON.stringify({
           theme,
-          content,
+          essay: content,
           submissionId,
         }),
       });
@@ -1163,29 +1163,29 @@ export default function EssayWritePage({ params }: PageProps) {
 
               {/* 詳細評価 */}
               <div style={styles.criteriaGrid}>
-                {Object.entries(evaluation.criteria).map(([key, criterion]: [string, any]) => (
-                  <div key={key} style={styles.criteriaItem}>
-                    <div style={styles.criteriaHeader}>
-                      <span style={styles.criteriaName}>
-                        {key === 'logic' ? '論理性' :
-                         key === 'concreteness' ? '具体性' :
-                         key === 'originality' ? '独創性' : '文章構成'}
-                      </span>
-                      <span style={styles.criteriaScore}>
-                        {criterion.score}/{criterion.maxScore}点
-                      </span>
-                    </div>
-                    <div style={styles.progressBar}>
-                      <div
-                        style={{
-                          ...styles.progressFill,
-                          width: `${(criterion.score / criterion.maxScore) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <p style={styles.criteriaComment}>{criterion.comment}</p>
-                  </div>
-                ))}
+                {Object.entries(evaluation.scores || {}).map(([key, score]: [string, any]) => (
+  <div key={key} style={styles.criteriaItem}>
+    <div style={styles.criteriaHeader}>
+      <span style={styles.criteriaName}>
+        {key === 'structure' ? '論理構成' :
+         key === 'argument' ? '論証力' :
+         key === 'expression' ? '表現力' : '独創性'}
+      </span>
+      <span style={styles.criteriaScore}>
+        {score}/25点
+      </span>
+    </div>
+    <div style={styles.progressBar}>
+      <div
+        style={{
+          ...styles.progressFill,
+          width: `${(score / 25) * 100}%`,
+        }}
+      />
+    </div>
+    <p style={styles.criteriaComment}>{evaluation.detailedFeedback?.[key] || ""}</p>
+  </div>
+))}
               </div>
 
               {/* 良い点 */}

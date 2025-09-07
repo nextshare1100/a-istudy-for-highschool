@@ -193,7 +193,7 @@ function EssayPageContent() {
       }
 
       const data = await response.json();
-      setGeneratedThemes(data.themes);
+      if (data.themes && data.themes[0]) { router.push(`/essay/write/${data.themes[0].id}`); }
     } catch (error) {
       console.error('Error generating custom theme:', error);
       alert('テーマの生成中にエラーが発生しました');
@@ -228,7 +228,7 @@ function EssayPageContent() {
       setGeneratedThemes([]);
       
       // 執筆画面へ遷移
-      router.push(`/essay/write/${data.themeId}`);
+      router.push(`/essay/write/${data.themes[0].id}`);
     } catch (error) {
       console.error('Error saving theme:', error);
       alert('テーマの保存中にエラーが発生しました');

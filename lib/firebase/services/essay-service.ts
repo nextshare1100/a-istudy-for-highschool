@@ -291,3 +291,66 @@ export const essayService = {
     }, 'updateEvaluation');
   }
 };
+  async getSubmission(submissionId: string): Promise<any | null> {
+    try {
+      const docRef = doc(db, 'essaySubmissions', submissionId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        return {
+          id: docSnap.id,
+          ...docSnap.data()
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting submission:', error);
+      throw error;
+    }
+  },
+
+  async getEvaluation(evaluationId: string): Promise<any | null> {
+    try {
+      const docRef = doc(db, 'essayEvaluations', evaluationId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        return {
+          id: docSnap.id,
+          ...docSnap.data()
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting evaluation:', error);
+      throw error;
+    }
+  },
+
+  async saveEvaluation(evaluation: any): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'essayEvaluations'), {
+        ...evaluation,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error saving evaluation:', error);
+      throw error;
+    }
+  },
+
+  async updateSubmission(submissionId: string, data: any): Promise<void> {
+    try {
+      const docRef = doc(db, 'essaySubmissions', submissionId);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error updating submission:', error);
+      throw error;
+    }
+  }
