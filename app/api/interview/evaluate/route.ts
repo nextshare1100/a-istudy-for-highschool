@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient } from '@/lib/gemini/client';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const client = getGeminiClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const questionText = formData.get('questionText') as string;
     const transcription = formData.get('transcription') as string;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // 音声分析のプロンプト
     const prompt = `

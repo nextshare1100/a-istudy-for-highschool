@@ -1,11 +1,11 @@
 // app/api/gemini/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient } from '@/lib/gemini/client';
 import { getAdminAuth } from '@/lib/firebase-admin';
 
 // Gemini APIの初期化
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const client = getGeminiClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
         
         const result = await model.generateContent(data.prompt);
         const response = await result.response;

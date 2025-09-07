@@ -1,436 +1,265 @@
-// app/api/essay/generate-custom-theme/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { verifyIdToken } from '@/lib/firebase/admin';
+import { getGeminiClient } from '@/lib/gemini/client';
+import { db } from '@/lib/firebase/index';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-// 環境変数からAPIキーを取得
-const genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY || 
-  process.env.GOOGLE_AI_API_KEY|| 
-  ''
-);
+// Gemini AIの初期化
+const client = getGeminiClient();
 
-// レート制限の定義
-const RATE_LIMIT = {
-  maxRequests: 10,
-  windowMs: 60 * 60 * 1000, // 1時間
+// カテゴリごとの専門用語（拡張版）
+const categoryKeywords = {
+  society: ['社会構造', '格差', '多様性', '共生', 'SDGs', 'グローバル化', '地域コミュニティ', 'デジタル社会', '高齢化', '少子化'],
+  culture: ['文化的多様性', 'アイデンティティ', '伝統', '価値観', '文化継承', 'ポップカルチャー', '文化交流', 'サブカルチャー'],
+  science: ['AI', 'バイオテクノロジー', 'イノベーション', '倫理', '持続可能性', '量子コンピュータ', '遺伝子工学', 'ロボティクス'],
+  environment: ['気候変動', '生物多様性', 'カーボンニュートラル', '循環型社会', '再生可能エネルギー', '海洋汚染', '森林保全'],
+  education: ['アクティブラーニング', 'STEAM教育', '生涯学習', 'EdTech', 'インクルーシブ教育', 'リスキリング', 'オンライン学習'],
+  economy: ['グローバル経済', 'デジタル通貨', '格差', '持続可能な成長', 'シェアリングエコノミー', 'ベーシックインカム', 'ESG投資'],
+  politics: ['民主主義', 'ガバナンス', '国際協調', '市民参加', 'デジタル民主主義', '地方創生', '国際紛争'],
+  ethics: ['生命倫理', 'AI倫理', '環境倫理', '医療倫理', 'ビジネス倫理', '研究倫理', 'メディア倫理']
 };
 
-// 簡易的なレート制限用のメモリストア
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+// ランダムな時事トピック
+const currentTopics = [
+  '2024年の社会動向',
+  'ポストコロナ時代',
+  'デジタルトランスフォーメーション',
+  'Z世代の価値観',
+  'グリーントランスフォーメーション',
+  'Web3.0時代',
+  'メタバース社会',
+  '人生100年時代'
+];
+
+// ランダムな視点
+const perspectives = [
+  '個人と社会の観点から',
+  '短期的・長期的な視点で',
+  '国内外の事例を踏まえて',
+  '歴史的経緯を考慮して',
+  '未来志向の観点から',
+  '多角的な視点で',
+  '実現可能性を考慮して',
+  '具体的な事例を挙げながら'
+];
 
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
+  console.log('AI theme generation API called');
   
   try {
-    // 認証チェック
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    const { success, decodedToken } = await verifyIdToken(token);
-    
-    if (!success || !decodedToken) {
-      return NextResponse.json({ error: '無効なトークンです' }, { status: 401 });
-    }
-
-    // レート制限チェック
-    const userId = decodedToken.uid;
-    const now = Date.now();
-    const userRequests = requestCounts.get(userId);
-    
-    if (userRequests) {
-      if (now < userRequests.resetTime) {
-        if (userRequests.count >= RATE_LIMIT.maxRequests) {
-          return NextResponse.json(
-            { error: 'リクエスト制限に達しました。1時間後に再試行してください。' },
-            { status: 429 }
-          );
-        }
-        userRequests.count++;
-      } else {
-        requestCounts.set(userId, { count: 1, resetTime: now + RATE_LIMIT.windowMs });
-      }
-    } else {
-      requestCounts.set(userId, { count: 1, resetTime: now + RATE_LIMIT.windowMs });
-    }
-
-    // APIキーの確認
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) {
-      console.error('[Error] Gemini API key is not set');
-      return NextResponse.json(
-        { error: 'システムエラーが発生しました' },
-        { status: 500 }
-      );
-    }
-
-    // リクエストボディの検証
     const body = await request.json();
-    const validationError = validateRequest(body);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-
-    const { options, count = 3 } = body;
-
-    // モデルの選択（グラフ問題の場合はPro、それ以外はFlash）
-    const modelName = options.includeGraph ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
-    const model = genAI.getGenerativeModel({ 
-      model: modelName,
-      generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
-
-    // プロンプトの構築
-    const prompt = buildProductionPrompt(options, count);
-
-    // テーマ生成（リトライ機能付き）
-    let result;
-    let retryCount = 0;
-    const maxRetries = 2;
+    const { options } = body;
     
-    while (retryCount <= maxRetries) {
-      try {
-        result = await model.generateContent(prompt);
-        break;
-      } catch (error) {
-        console.error(`[Error] Generation attempt ${retryCount + 1} failed:`, error);
-        retryCount++;
-        if (retryCount > maxRetries) {
-          throw error;
-        }
-        // 指数バックオフ
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-      }
-    }
-
-    if (!result) {
-      throw new Error('テーマ生成に失敗しました');
-    }
-
-    const response = await result.response;
-    const text = response.text();
-
-    // パース処理
-    const themes = parseProductionThemes(text, options);
-
-    // 生成されたテーマの検証
-    if (themes.length === 0) {
-      console.error('[Error] No themes parsed from response:', text);
-      throw new Error('有効なテーマが生成されませんでした');
-    }
-
-    // レスポンスタイムのログ
-    const responseTime = Date.now() - startTime;
-    console.log(`[Success] Generated ${themes.length} themes in ${responseTime}ms using ${modelName}`);
-
-    return NextResponse.json({
-      success: true,
-      count: themes.length,
-      themes,
-      metadata: {
-        model: modelName,
-        responseTime,
-        userId: userId.substring(0, 8) + '...', // プライバシー保護
-      }
-    });
-
-  } catch (error) {
-    const responseTime = Date.now() - startTime;
-    console.error(`[Error] Theme generation failed after ${responseTime}ms:`, error);
-    
-    // エラーレスポンス
-    if (error instanceof Error) {
-      // Gemini APIのエラーをユーザーフレンドリーに変換
-      if (error.message.includes('quota')) {
-        return NextResponse.json(
-          { error: 'API利用制限に達しました。しばらく待ってから再試行してください。' },
-          { status: 503 }
-        );
-      }
-      if (error.message.includes('timeout')) {
-        return NextResponse.json(
-          { error: 'タイムアウトしました。もう一度お試しください。' },
-          { status: 504 }
-        );
-      }
+    // Gemini APIキーの確認
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY is not set');
+      return fallbackResponse(options);
     }
     
+    const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const keywords = categoryKeywords[options.category as keyof typeof categoryKeywords] || [];
+    
+    // ランダム要素を追加
+    const randomKeywords = keywords.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const randomTopic = currentTopics[Math.floor(Math.random() * currentTopics.length)];
+    const randomPerspective = perspectives[Math.floor(Math.random() * perspectives.length)];
+    const randomSeed = Math.random().toString(36).substring(7);
+    
+    const prompt = `
+大学入試の小論文テーマを1つ生成してください。
+必ず新しい独自のテーマを作成し、既存のテーマと重複しないようにしてください。
+
+【条件】
+- トピック: ${options.topic}
+- カテゴリ: ${options.category}
+- 文字数: ${options.wordLimit}字（${options.wordLimit * 0.8}字〜${options.wordLimit}字）
+- 制限時間: ${options.timeLimit}分
+- 難易度: ${options.difficulty}/5
+- 参考キーワード: ${randomKeywords.join(', ')}
+- 時事的な文脈: ${randomTopic}
+- 論述の視点: ${randomPerspective}
+- ユニークID: ${randomSeed}
+${options.includeGraph ? '- グラフやデータの読み取りを含む' : ''}
+${options.specificRequirements ? `- 追加要件: ${options.specificRequirements}` : ''}
+
+【重要な指示】
+1. 必ず他とは異なる独自性のあるテーマを生成すること
+2. ${randomTopic}の文脈を含めること
+3. 問題文に${randomPerspective}という指示を含めること
+4. 現代的で具体的な問題設定にすること
+
+【出力形式】
+以下の形式でJSONを出力してください：
+{
+  "title": "テーマのタイトル（20字以内）",
+  "description": "問題文（${options.wordLimit}字で論述することを明確に指示）",
+  "background": "このテーマの社会的背景（100字程度）",
+  "evaluationPoints": [
+    "評価ポイント1",
+    "評価ポイント2",
+    "評価ポイント3",
+    "評価ポイント4"
+  ],
+  "keywords": ["キーワード1", "キーワード2", "キーワード3"],
+  "hints": [
+    "論述のヒント1",
+    "論述のヒント2"
+  ]
+}
+
+難易度設定：
+- ${options.difficulty === 5 ? '抽象的で哲学的な内容、複雑な概念の統合が必要' : 
+    options.difficulty === 4 ? '高度な分析力と批判的思考が必要' :
+    options.difficulty === 3 ? 'バランスの取れた論証と具体例の提示が必要' :
+    options.difficulty === 2 ? '基本的な論理構成と一般的な知識で対応可能' :
+    '具体的で身近な内容、明確な結論が導きやすい'}
+`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
+      
+      // JSONを抽出
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      let generatedTheme;
+      
+      if (jsonMatch) {
+        generatedTheme = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Failed to parse AI response');
+      }
+      
+      // 必須フィールドを追加
+      const theme = {
+        ...generatedTheme,
+        category: options.category,
+        wordLimit: options.wordLimit,
+        timeLimit: options.timeLimit,
+        difficulty: options.difficulty,
+        type: 'custom',
+        requirements: {
+          minWords: Math.floor(options.wordLimit * 0.8),
+          maxWords: options.wordLimit,
+          timeLimit: options.timeLimit,
+          mustInclude: generatedTheme.keywords || []
+        },
+        includeGraph: options.includeGraph || false,
+        generationSeed: randomSeed,
+        generatedAt: new Date().toISOString()
+      };
+      
+      // Firestoreに保存
+      const docRef = await addDoc(collection(db, 'essay_themes'), {
+        ...theme,
+        createdAt: serverTimestamp(),
+        generatedBy: 'ai',
+        uniqueId: randomSeed
+      });
+      
+      return NextResponse.json({
+        success: true,
+        count: 1,
+        themes: [{
+          ...theme,
+          id: docRef.id
+        }]
+      });
+      
+    } catch (aiError) {
+      console.error('AI generation error:', aiError);
+      return fallbackResponse(options);
+    }
+    
+  } catch (error: any) {
+    console.error('API Error:', error);
     return NextResponse.json(
-      { error: 'テーマの生成に失敗しました。もう一度お試しください。' },
+      { error: 'テーマの生成に失敗しました', details: error.message },
       { status: 500 }
     );
   }
 }
 
-// リクエストの検証
-function validateRequest(body: any): string | null {
-  if (!body.options) {
-    return 'オプションが指定されていません';
-  }
-
-  const { options } = body;
+// フォールバック用のレスポンス（改善版）
+function fallbackResponse(options: any) {
+  const themes = {
+    society: [
+      { title: 'AIと共生する社会', description: 'AI技術の発展が社会にもたらす影響と、人間とAIが共生するための課題について論じなさい。' },
+      { title: '少子高齢化への対応', description: '日本の少子高齢化問題に対する効果的な解決策について論じなさい。' },
+      { title: 'デジタル格差の解消', description: 'デジタル技術の普及に伴う格差問題とその解決策について論じなさい。' },
+      { title: '地域コミュニティの再生', description: '現代社会における地域コミュニティの役割と活性化の方法について論じなさい。' }
+    ],
+    culture: [
+      { title: '文化の継承と革新', description: '伝統文化を守りながら新しい価値を創造することの重要性について論じなさい。' },
+      { title: 'グローバル化と文化', description: 'グローバル化が進む中で、文化的アイデンティティを保つことの意義について論じなさい。' },
+      { title: '現代アートの社会的役割', description: '現代アートが社会に果たす役割と可能性について論じなさい。' },
+      { title: 'デジタル時代の創造性', description: 'デジタル技術が文化創造に与える影響について論じなさい。' }
+    ],
+    science: [
+      { title: '科学技術と倫理', description: '最先端技術の開発において倫理的配慮が必要な理由について論じなさい。' },
+      { title: '持続可能な技術革新', description: '環境に配慮した技術イノベーションの重要性について論じなさい。' },
+      { title: 'バイオテクノロジーの未来', description: '生命科学の進歩がもたらす可能性と課題について論じなさい。' },
+      { title: '宇宙開発の意義', description: '人類にとっての宇宙開発の意義と今後の展望について論じなさい。' }
+    ],
+    environment: [
+      { title: '気候変動対策', description: '個人レベルでできる気候変動対策とその効果について論じなさい。' },
+      { title: '循環型社会の実現', description: '持続可能な循環型社会を実現するための課題と解決策について論じなさい。' },
+      { title: '生物多様性の保全', description: '生物多様性を守ることの重要性と具体的な方策について論じなさい。' },
+      { title: '都市と自然の共生', description: '都市開発と自然環境保護の両立について論じなさい。' }
+    ]
+  };
   
-  if (!options.topic || typeof options.topic !== 'string') {
-    return 'トピックが無効です';
-  }
+  const categoryThemes = themes[options.category as keyof typeof themes] || themes.society;
   
-  if (!options.category || typeof options.category !== 'string') {
-    return 'カテゴリーが無効です';
-  }
+  // ランダム性を高めるために複数の要素を組み合わせる
+  const randomIndex = Math.floor(Math.random() * categoryThemes.length);
+  const selectedTheme = categoryThemes[randomIndex];
+  const randomPerspective = perspectives[Math.floor(Math.random() * perspectives.length)];
   
-  if (!options.wordLimit || typeof options.wordLimit !== 'number' || options.wordLimit < 200 || options.wordLimit > 2000) {
-    return '文字数制限は200〜2000字の範囲で指定してください';
-  }
+  // 問題文にランダムな視点を追加
+  const modifiedDescription = selectedTheme.description.replace('論じなさい。', `${randomPerspective}論じなさい。`);
   
-  if (!options.timeLimit || typeof options.timeLimit !== 'number' || options.timeLimit < 30 || options.timeLimit > 180) {
-    return '制限時間は30〜180分の範囲で指定してください';
-  }
-  
-  if (!options.difficulty || typeof options.difficulty !== 'number' || options.difficulty < 1 || options.difficulty > 5) {
-    return '難易度は1〜5の範囲で指定してください';
-  }
-
-  return null;
-}
-
-// 本番環境用のプロンプト
-function buildProductionPrompt(options: any, count: number): string {
-  const { topic, category, faculty, wordLimit, timeLimit, difficulty, includeGraph, specificRequirements } = options;
-
-  let prompt = `
-あなたは日本の大学入試問題作成の専門家です。
-以下の条件に基づいて、実際の大学入試で出題されるレベルの小論文問題を${count}個作成してください。
-
-【必須条件】
-- トピック: ${topic}
-- カテゴリー: ${category}
-- 文字数: ${wordLimit}字（${Math.floor(wordLimit * 0.8)}字以上${wordLimit}字以内）
-- 制限時間: ${timeLimit}分
-- 難易度: ${difficulty}/5（1:易しい、3:標準、5:難しい）
-${faculty ? `- 対象学部: ${faculty}` : ''}
-${includeGraph ? '- 必ずグラフ・図表・データを含める' : ''}
-${specificRequirements ? `- 特別要件: ${specificRequirements}` : ''}
-
-【出力形式】
-各問題は必ず以下の形式で出力してください：
-
-タイトル: [30字以内の簡潔なタイトル]
-問題文: [実際の試験で使用する完全な問題文。具体的な指示を含み、${wordLimit}字で解答することを明記]
-${includeGraph ? `提示資料: [グラフ・図表・データの詳細な説明。縦軸・横軸・単位・数値を具体的に記述]
-読み取りポイント: [データから読み取るべき重要なポイント3-5個、カンマ区切り]` : ''}
-出題意図: [この問題で測定したい能力や知識を簡潔に説明]
-キーワード: [解答に含まれるべき重要な概念3-5個、カンマ区切り]
-評価基準: [採点時の重要な観点4-5個、カンマ区切り]
-
----
-
-【問題作成の指針】
-1. 問題文は具体的で明確な指示を含むこと
-2. 「〜について${wordLimit}字以内で論じなさい」のような明確な字数指定を含むこと
-3. 難易度${difficulty}に相応しい内容にすること
-4. 実際の大学入試で出題される水準の問題にすること
-5. ${timeLimit}分で解答可能な範囲に収めること
-${includeGraph ? '6. グラフや図表は具体的な数値を含み、分析・考察が必要な内容にすること' : ''}
-
-それでは、上記の条件に従って問題を作成してください。
-`;
-
-  return prompt;
-}
-
-// 本番環境用のパース処理
-function parseProductionThemes(text: string, options: any): any[] {
-  const themes = [];
-  const themeBlocks = text.split('---').filter(block => block.trim());
-
-  for (const block of themeBlocks) {
-    try {
-      const theme = parseThemeBlock(block, options);
-      if (theme && validateTheme(theme)) {
-        themes.push(theme);
-      }
-    } catch (error) {
-      console.error('[Warning] Failed to parse theme block:', error);
-      // パースに失敗したブロックはスキップ
-      continue;
-    }
-  }
-
-  return themes;
-}
-
-// 個別のテーマブロックをパース
-function parseThemeBlock(block: string, options: any): any {
-  const lines = block.trim().split('\n').filter(line => line.trim());
-  
-  const theme: any = {
-    id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  const theme = {
+    ...selectedTheme,
+    description: modifiedDescription,
     category: options.category,
-    faculties: options.faculty ? [options.faculty] : ['all'],
     wordLimit: options.wordLimit,
     timeLimit: options.timeLimit,
     difficulty: options.difficulty,
-    hasGraph: options.includeGraph,
     type: 'custom',
-    createdByAI: true,
-    createdAt: new Date().toISOString(),
+    background: `このテーマは${currentTopics[Math.floor(Math.random() * currentTopics.length)]}における重要な課題の一つです。`,
     requirements: {
       minWords: Math.floor(options.wordLimit * 0.8),
       maxWords: options.wordLimit,
       timeLimit: options.timeLimit
-    }
+    },
+    evaluationPoints: [
+      '論理的構成力',
+      '具体例の適切性',
+      '独自の視点',
+      '結論の明確性'
+    ],
+    keywords: ['課題', '解決策', '展望'],
+    hints: [
+      '序論で問題の背景を明確にする',
+      '具体例を交えて論証する'
+    ],
+    generationSeed: Math.random().toString(36).substring(7)
   };
-
-  let currentKey = '';
-  let currentValue = '';
-  let resourceData = '';
-  let readingPoints = [];
-  let evaluationCriteria = [];
-  let keywords = [];
-  let intent = '';
-
-  for (const line of lines) {
-    if (line.includes(':')) {
-      // 前のキーと値を処理
-      if (currentKey && currentValue) {
-        processKeyValue(currentKey, currentValue, theme, {
-          resourceData,
-          readingPoints,
-          evaluationCriteria,
-          keywords,
-          intent
-        });
-      }
-      
-      // 新しいキーと値を取得
-      const colonIndex = line.indexOf(':');
-      currentKey = line.substring(0, colonIndex).trim();
-      currentValue = line.substring(colonIndex + 1).trim();
-    } else {
-      // 複数行にわたる値の場合
-      currentValue += '\n' + line;
-    }
-  }
-
-  // 最後のキーと値を処理
-  if (currentKey && currentValue) {
-    processKeyValue(currentKey, currentValue, theme, {
-      resourceData,
-      readingPoints,
-      evaluationCriteria,
-      keywords,
-      intent
+  
+  // Firestoreに保存
+  return addDoc(collection(db, 'essay_themes'), {
+    ...theme,
+    createdAt: serverTimestamp(),
+    generatedBy: 'fallback',
+    uniqueId: theme.generationSeed
+  }).then(docRef => {
+    return NextResponse.json({
+      success: true,
+      count: 1,
+      themes: [{
+        ...theme,
+        id: docRef.id
+      }]
     });
-  }
-
-  // 問題文の構築
-  if (theme.questionText) {
-    theme.description = theme.questionText;
-    
-    // グラフ情報を追加
-    if (resourceData && options.includeGraph) {
-      theme.description += `\n\n【提示資料】\n${resourceData}`;
-      if (readingPoints.length > 0) {
-        theme.description += `\n\n【分析の視点】\n${readingPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
-      }
-    }
-    
-    // 出題意図を追加（メタデータとして）
-    if (intent) {
-      theme.intent = intent;
-    }
-  }
-
-  // キーワードと評価基準を設定
-  if (keywords.length > 0) {
-    theme.keywords = keywords;
-  }
-  
-  if (evaluationCriteria.length > 0) {
-    theme.evaluationCriteria = evaluationCriteria;
-  }
-
-  return theme;
-}
-
-// キーと値のペアを処理
-function processKeyValue(key: string, value: string, theme: any, extras: any) {
-  const normalizedKey = key.toLowerCase().replace(/\s/g, '');
-  value = value.trim();
-
-  switch (normalizedKey) {
-    case 'タイトル':
-    case 'title':
-      theme.title = value.substring(0, 30); // 30字制限
-      break;
-    case '問題文':
-    case 'question':
-    case 'questiontext':
-      theme.questionText = value;
-      break;
-    case '提示資料':
-    case '提示データ':
-    case 'resource':
-    case 'data':
-      extras.resourceData = value;
-      break;
-    case '読み取りポイント':
-    case '読み取りぽいんと':
-    case 'readingpoints':
-      extras.readingPoints = value.split(/[、,]/).map(p => p.trim()).filter(p => p);
-      break;
-    case '出題意図':
-    case 'intent':
-      extras.intent = value;
-      break;
-    case 'キーワード':
-    case 'きーわーど':
-    case 'keywords':
-      extras.keywords = value.split(/[、,]/).map(k => k.trim()).filter(k => k);
-      break;
-    case '評価基準':
-    case 'ひょうかきじゅん':
-    case 'evaluationcriteria':
-    case 'criteria':
-      extras.evaluationCriteria = value.split(/[、,]/).map(c => c.trim()).filter(c => c);
-      break;
-  }
-}
-
-// テーマの検証
-function validateTheme(theme: any): boolean {
-  // 必須フィールドの確認
-  if (!theme.title || !theme.description) {
-    return false;
-  }
-  
-  // タイトルの長さ確認
-  if (theme.title.length > 30) {
-    theme.title = theme.title.substring(0, 30);
-  }
-  
-  // 問題文の最低限の長さ確認
-  if (theme.description.length < 50) {
-    return false;
-  }
-  
-  // キーワードの数を制限
-  if (theme.keywords && theme.keywords.length > 10) {
-    theme.keywords = theme.keywords.slice(0, 10);
-  }
-  
-  // 評価基準の数を制限
-  if (theme.evaluationCriteria && theme.evaluationCriteria.length > 10) {
-    theme.evaluationCriteria = theme.evaluationCriteria.slice(0, 10);
-  }
-  
-  return true;
+  });
 }
