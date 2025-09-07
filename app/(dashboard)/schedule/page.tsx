@@ -787,7 +787,84 @@ export default function SchedulePage() {
     )
   }
 
+  // 学習セグメントを生成する関数
   // サイドパネルのコンテンツ（実際のデータを使用）
+  // 学習セグメントを生成する関数
+  const generateStudySegments = (session: any) => {
+    const duration = calculateDuration(session.startTime, session.endTime)
+    const segments = []
+    
+    // 復習フェーズ（学習タイプがreviewまたは基礎レベルの場合）
+    if (session.studyType === 'review' || session.level === 'basic') {
+      const reviewTime = Math.floor(duration * 0.2)
+      segments.push({
+        activity: '基礎確認',
+        duration: reviewTime,
+        description: `${session.subject}の${session.unit}で学習した基本事項を確認。重要な公式・概念を整理`
+      })
+    }
+    
+    // メイン学習フェーズ
+    const mainTime = session.studyType === 'review' ? 
+      Math.floor(duration * 0.5) : 
+      Math.floor(duration * 0.6)
+    
+    segments.push({
+      activity: session.studyType === 'concept' ? '概念理解' : 
+                session.studyType === 'practice' ? '問題演習' : 
+                session.studyType === 'review' ? '要点復習' : '実戦演習',
+      duration: mainTime,
+      description: getMainDescription(session.subject, session.unit, session.studyType)
+    })
+    
+    // 演習・確認フェーズ
+    const remainingTime = duration - segments.reduce((sum, s) => sum + s.duration, 0)
+    if (remainingTime > 0) {
+      segments.push({
+        activity: session.studyType === 'practice' ? '応用問題' : '理解度確認',
+        duration: remainingTime,
+        description: session.targetProblems ? 
+          `目標${session.targetProblems}問の演習。解けなかった問題は解説を確認` :
+          '学習内容の定着確認'
+      })
+    }
+    
+    return segments
+  }
+  
+  // 時間計算関数
+  const calculateDuration = (startTime: string, endTime: string) => {
+    const [startHour, startMin] = startTime.split(':').map(Number)
+    const [endHour, endMin] = endTime.split(':').map(Number)
+    return (endHour * 60 + endMin) - (startHour * 60 + startMin)
+  }
+  
+  // 学習内容の説明を生成
+  const getMainDescription = (subject: string, unit: string, studyType: string) => {
+    const descriptions: any = {
+      concept: {
+        '数学': `${unit}の定理・公式を例題を通じて理解。証明過程も確認`,
+        '英語': `${unit}の文法規則を例文とともに学習。実際の用例も確認`,
+        '国語': `${unit}の読解ポイントを整理。重要語句の意味も確認`,
+        'default': `${unit}の基本概念を体系的に学習`
+      },
+      practice: {
+        '数学': `${unit}の標準〜応用問題を解く。解法パターンの習得に重点`,
+        '英語': `${unit}の文法を使った英作文・読解練習`,
+        '国語': `${unit}の実践的な読解問題に取り組む`,
+        'default': `${unit}の演習問題で実力を確認`
+      },
+      review: {
+        '数学': `${unit}で間違えやすいポイントを中心に復習`,
+        '英語': `${unit}の重要構文・単語を総復習`,
+        '国語': `${unit}の要点を整理し、理解を深める`,
+        'default': `${unit}の重要事項を効率的に復習`
+      }
+    }
+    
+    const subjectKey = ['数学', '英語', '国語'].find(s => subject.includes(s)) || 'default'
+    return descriptions[studyType]?.[subjectKey] || descriptions[studyType]?.['default'] || `${unit}の学習`
+  }
   const SidePanelContent = () => (
     <>
       {/* 週間進捗 - コンパクト版 */}
@@ -895,6 +972,39 @@ export default function SchedulePage() {
                     {session.materials && session.materials.length > 0 && (
                       <div style={{ marginTop: '4px', fontSize: '11px', color: '#94a3b8' }}>
                         教材: {session.materials.join(', ')}
+                      </div>
+                    )}
+                    {/* 学習内容の詳細を追加 */}
+                    {!isCompleted && (
+                      <div style={{
+                        marginTop: '8px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid #e5e7eb',
+                      }}>
+                        {generateStudySegments(session).map((segment: any, idx: number) => (
+                          <div key={idx} style={{
+                            marginBottom: '6px',
+                            paddingLeft: '12px',
+                            borderLeft: '3px solid #e5e7eb',
+                            fontSize: '11px',
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              marginBottom: '2px',
+                            }}>
+                              <span style={{ fontWeight: '500', color: '#374151' }}>
+                                {segment.activity}
+                              </span>
+                              <span style={{ color: '#6b7280' }}>
+                                {segment.duration}分
+                              </span>
+                            </div>
+                            <div style={{ color: '#6b7280', lineHeight: '1.4' }}>
+                              {segment.description}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

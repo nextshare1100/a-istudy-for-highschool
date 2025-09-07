@@ -9,7 +9,6 @@ import {
   User, 
   Bell, 
   BookOpen, 
-  CreditCard, 
   LogOut, 
   Trash2, 
   Save,
@@ -17,7 +16,8 @@ import {
   Crown,
   AlertCircle,
   Loader2,
-  BarChart3
+  BarChart3,
+  ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,11 +30,6 @@ interface UserProfile {
     reminder: boolean
     achievement: boolean
     marketing: boolean
-  }
-  subscription: {
-    plan: 'free' | 'premium'
-    status: 'active' | 'cancelled' | 'expired'
-    expiresAt?: Date
   }
 }
 
@@ -541,11 +536,6 @@ export default function SettingsPage() {
                 reminder: true,
                 achievement: true,
                 marketing: false
-              },
-              subscription: userProfile.subscription || {
-                plan: 'premium',
-                status: 'active',
-                expiresAt: new Date('2024-12-31')
               }
             })
           } else {
@@ -559,11 +549,6 @@ export default function SettingsPage() {
                 reminder: true,
                 achievement: true,
                 marketing: false
-              },
-              subscription: {
-                plan: 'premium',
-                status: 'active',
-                expiresAt: new Date('2024-12-31')
               }
             })
           }
@@ -579,11 +564,6 @@ export default function SettingsPage() {
               reminder: true,
               achievement: true,
               marketing: false
-            },
-            subscription: {
-              plan: 'premium',
-              status: 'active',
-              expiresAt: new Date('2024-12-31')
             }
           })
         }
@@ -724,6 +704,26 @@ export default function SettingsPage() {
     }
   }
 
+  const handleManageSubscription = () => {
+    // プラットフォームを検出（簡易的な判定）
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isIOS = /iphone|ipad|ipod/.test(userAgent)
+    const isAndroid = /android/.test(userAgent)
+    
+    if (isIOS) {
+      // App Storeのサブスクリプション管理ページへ
+      window.open('https://apps.apple.com/account/subscriptions', '_blank')
+    } else if (isAndroid) {
+      // Google Play Storeのサブスクリプション管理ページへ
+      window.open('https://play.google.com/store/account/subscriptions', '_blank')
+    } else {
+      toast({
+        title: "お知らせ",
+        description: "モバイルデバイスからアクセスしてください",
+      })
+    }
+  }
+
   if (loading || !profile) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -845,15 +845,6 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <Label htmlFor="currentPassword">現在のパスワード</Label>
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                    />
-                  </div>
                   <div>
                     <Label htmlFor="newPassword">新しいパスワード</Label>
                     <Input
@@ -1061,11 +1052,11 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CreditCard style={{ width: '18px', height: '18px' }} />
+                  <Crown style={{ width: '18px', height: '18px' }} />
                   サブスクリプション
                 </CardTitle>
                 <CardDescription>
-                  現在のプラン情報を確認できます
+                  プランの管理はストアから行ってください
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1077,76 +1068,54 @@ export default function SettingsPage() {
                     border: '1px solid #93c5fd'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: '600' }}>A-IStudy プラン</span>
+                      <span style={{ fontSize: '1rem', fontWeight: '600' }}>A-IStudy プレミアム</span>
                       <span style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                         ¥980<span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>/月</span>
                       </span>
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: '#4b5563', marginBottom: '0.75rem' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#4b5563' }}>
                       すべての学習機能をご利用いただけます
                     </p>
-                    <div style={{ fontSize: '0.75rem' }}>
-                      <p style={{ marginBottom: '0.375rem' }}>
-                        ステータス: 
-                        <span style={{
-                          marginLeft: '0.375rem',
-                          fontWeight: '500',
-                          color: profile.subscription.status === 'active' ? '#059669' : 
-                                 profile.subscription.status === 'cancelled' ? '#ea580c' : 
-                                 '#dc2626'
-                        }}>
-                          {profile.subscription.status === 'active' ? '利用中' :
-                           profile.subscription.status === 'cancelled' ? '解約済み' :
-                           '期限切れ'}
-                        </span>
-                      </p>
-                      {profile.subscription.expiresAt && (
-                        <p>
-                          {profile.subscription.status === 'cancelled' ? '利用期限' : '次回更新日'}: 
-                          <span style={{ marginLeft: '0.375rem', fontWeight: '500' }}>
-                            {profile.subscription.expiresAt.toLocaleDateString('ja-JP')}
-                          </span>
-                        </p>
-                      )}
-                    </div>
                   </div>
 
-                  {profile.subscription.status === 'active' && (
-                    <>
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.75rem'
-                      }}>
-                        <p style={{ color: '#4b5563' }}>
-                          解約すると、利用期限後はサービスをご利用いただけなくなります。
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push('/account/subscription')}
-                        className="w-full"
-                        size="sm"
-                      >
-                        サブスクリプションを解約
-                      </Button>
-                    </>
-                  )}
-
-                  {profile.subscription.status === 'cancelled' && (
-                    <div style={{
-                      padding: '0.75rem',
-                      backgroundColor: '#fef3c7',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #fcd34d',
-                      fontSize: '0.75rem'
-                    }}>
-                      <p style={{ color: '#92400e' }}>
-                        解約手続きが完了しています。利用期限まではサービスをご利用いただけます。
-                      </p>
+                  <div style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.813rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
+                      <AlertCircle style={{ width: '14px', height: '14px', color: '#6b7280' }} />
+                      <span style={{ fontWeight: '500', color: '#374151' }}>サブスクリプションの管理について</span>
                     </div>
-                  )}
+                    <p style={{ color: '#6b7280', lineHeight: '1.5' }}>
+                      サブスクリプションの解約や変更は、お使いのデバイスのストアから行ってください。
+                      <br />
+                      • iPhone/iPad: App Storeの「サブスクリプション」
+                      <br />
+                      • Android: Google Play Storeの「定期購入」
+                    </p>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleManageSubscription}
+                    size="sm"
+                  >
+                    <ExternalLink style={{ width: '14px', height: '14px' }} />
+                    ストアで管理する
+                  </Button>
+
+                  <div style={{
+                    padding: '0.5rem',
+                    backgroundColor: '#fef3c7',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem'
+                  }}>
+                    <p style={{ color: '#92400e' }}>
+                      ※ アプリ内から直接解約することはできません
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

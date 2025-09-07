@@ -1,27 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ProgressChart } from '@/components/progress/progress-chart';
-import { WeaknessAnalysis } from '@/components/progress/weakness-analysis';
-import { StudyHistory } from '@/components/progress/study-history';
 import { useProgress } from '@/hooks/use-progress';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 import { 
   TrendingUp, 
   Clock, 
   Target, 
   Brain,
   ChevronRight,
-  FileText,
-  Sparkles,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
-import { formatDuration } from 'date-fns';
-import { ja } from 'date-fns/locale';
 
 // 科目の日本語表記マッピング
 const subjectLabels: Record<string, string> = {
@@ -35,308 +26,235 @@ const subjectLabels: Record<string, string> = {
 export default function ProgressPage() {
   const router = useRouter();
   const { progress, metrics, isLoading, analyzeProgress, isAnalyzing } = useProgress();
-  const [activeTab, setActiveTab] = useState<'overview' | 'weakness' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'subject'>('overview');
+  
+  // Storeから追加のデータを取得
+  const { weaknesses, fetchWeaknesses } = useAnalyticsStore();
+  
+  useEffect(() => {
+    fetchWeaknesses();
+  }, [fetchWeaknesses]);
 
-  // ローディング状態
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-24 bg-gray-200 rounded-2xl"></div>
+            <div className="h-24 bg-gray-200 rounded-2xl"></div>
+          </div>
         </div>
-        <Skeleton className="h-96" />
       </div>
     );
   }
 
-  if (!progress) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="text-center py-12">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">進捗データを取得できませんでした。</p>
-            <Button className="mt-4" onClick={() => window.location.reload()}>
-              再読み込み
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // グラフ用データの整形
-  const chartData = {
-    timeSeries: progress.recentActivity.map(activity => ({
-      date: activity.createdAt.toString(),
-      mastery: progress.overall.mastery,
-      correctRate: progress.overall.correctRate * 100,
-    })),
-    topicData: progress.subjects.flatMap(subject => 
-      Object.entries(subject.topics || {}).map(([topic, mastery]) => ({
-        topic: `${subjectLabels[subject.subject]} - ${topic}`,
-        mastery,
-        questions: 0,
-        lastStudied: subject.lastStudied?.toString() || ''
-      }))
-    ),
-    radarData: progress.subjects.map(subject => ({
-      subject: subjectLabels[subject.subject],
-      current: subject.mastery,
-      target: 80,
-      average: 65
-    }))
-  };
-
-  // 弱点データ（仮のデータ - 実際はAPIから取得）
-  const weakPoints = [
-    {
-      id: '1',
-      topic: '二次関数',
-      subtopic: '頂点の求め方',
-      errorType: '概念理解不足',
-      frequency: 5,
-      lastOccurred: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      severity: 'high' as const,
-      examples: ['y = 2x² + 4x + 1 の頂点を求める問題'],
-      improvementRate: 30
-    },
-    {
-      id: '2',
-      topic: '英文法',
-      subtopic: '仮定法',
-      errorType: '文法ミス',
-      frequency: 3,
-      lastOccurred: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      severity: 'medium' as const,
-      examples: ['If I were you, I would...の構文'],
-      improvementRate: 60
-    }
-  ];
-
-  const recommendations = [
-    {
-      id: '1',
-      weakPointId: '1',
-      type: 'practice' as const,
-      title: '二次関数基礎演習',
-      description: '頂点の求め方を基礎から復習',
-      estimatedTime: 30,
-      priority: 5
-    },
-    {
-      id: '2',
-      weakPointId: '2',
-      type: 'video' as const,
-      title: '仮定法マスター講座',
-      description: '仮定法の使い方を動画で解説',
-      estimatedTime: 20,
-      priority: 4
-    }
-  ];
-
-  // 学習履歴データ（仮のデータ）
-  const studySessions = progress.recentActivity.slice(0, 10).map((activity, index) => ({
-    id: activity.id,
-    date: activity.createdAt,
-    subject: activity.subject,
-    topic: activity.topic,
-    totalQuestions: 10,
-    correctAnswers: activity.isCorrect ? 8 : 6,
-    timeSpent: 900 + index * 120,
-    timerType: index % 3 === 0 ? 'pomodoro' as const : undefined,
-    mastery: 70 + index * 2
-  }));
+  // 実際のメトリクスを使用
+  const weeklyHours = metrics ? Math.floor(metrics.weeklyStudyTime / 3600) : 0;
+  const weeklyMinutes = metrics ? Math.floor((metrics.weeklyStudyTime % 3600) / 60) : 0;
+  const targetAchievement = metrics?.targetAchievement || 0;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📊 学習進捗ダッシュボード</h1>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
+      <div className="bg-white border-b px-4 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">学習進捗</h1>
+          <button
             onClick={() => analyzeProgress({ timeframe: 'week' })}
             disabled={isAnalyzing}
+            className="flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
           >
-            <Sparkles className="w-4 h-4 mr-1" />
-            AI分析を実行
-          </Button>
-          <Button variant="outline">
-            <FileText className="w-4 h-4 mr-1" />
-            レポート生成
-          </Button>
+            {isAnalyzing ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Brain className="w-4 h-4" />
+            )}
+            AI分析
+          </button>
         </div>
       </div>
 
-      {/* サマリーカード */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">総合進捗</CardTitle>
-            <Brain className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{progress.overall.mastery}%</div>
-            <Progress value={progress.overall.mastery} className="mt-2" />
-            {metrics?.trend && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {metrics.trend === 'improving' ? '上昇傾向' : 
-                 metrics.trend === 'declining' ? '下降傾向' : '安定'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">今週の学習時間</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.floor((metrics?.weeklyStudyTime || 0) / 3600)}時間
-              {Math.floor(((metrics?.weeklyStudyTime || 0) % 3600) / 60)}分
+      <div className="p-4 space-y-4">
+        {/* サマリーカード */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+              <span className="text-sm text-gray-600">今週の学習時間</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-gray-900">{weeklyHours}時間{weeklyMinutes}</span>
+              <span className="text-sm text-gray-600">分</span>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
               目標: 週20時間
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">目標達成</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {progress.subjects.filter(s => s.mastery >= 70).length}/{progress.subjects.length}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              習熟度70%以上の科目
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* タブ切り替え */}
-      <div className="flex gap-2 border-b">
-        <Button
-          variant={activeTab === 'overview' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('overview')}
-        >
-          概要
-        </Button>
-        <Button
-          variant={activeTab === 'weakness' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('weakness')}
-        >
-          弱点分析
-        </Button>
-        <Button
-          variant={activeTab === 'history' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('history')}
-        >
-          学習履歴
-        </Button>
-      </div>
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <Target className="w-5 h-5 text-green-600" />
+              </div>
+              <span className="text-sm text-gray-600">目標達成率</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-gray-900">{targetAchievement}</span>
+              <span className="text-sm text-gray-600">%</span>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              習熟度70%以上: {progress?.subjects.filter(s => s.mastery >= 70).length || 0}/{progress?.subjects.length || 5}科目
+            </div>
+          </div>
+        </div>
 
-      {/* タブコンテンツ */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* 進捗グラフ */}
-          <ProgressChart data={chartData} />
+        {/* タブ */}
+        <div className="flex gap-2 bg-white rounded-2xl p-1">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === 'overview' 
+                ? 'bg-blue-500 text-white' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            概要
+          </button>
+          <button
+            onClick={() => setActiveTab('subject')}
+            className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === 'subject' 
+                ? 'bg-blue-500 text-white' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            科目別
+          </button>
+        </div>
 
-          {/* 科目別進捗 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">🎯 科目別進捗</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {progress.subjects.map((subject) => (
-                  <div
-                    key={subject.subject}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => router.push(`/progress/${subject.subject}`)}
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{subjectLabels[subject.subject]}</h3>
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex-1">
-                          <Progress value={subject.mastery} className="h-2" />
-                        </div>
-                        <span className="text-sm font-medium">{subject.mastery}%</span>
+        {/* タブコンテンツ */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            {/* 週間進捗グラフ */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <h3 className="text-base font-semibold text-gray-900 mb-3">週間学習時間</h3>
+              <div className="flex justify-between items-end h-32">
+                {['月', '火', '水', '木', '金', '土', '日'].map((day, index) => {
+                  // TODO: 実際の日別データを使用
+                  const height = Math.random() * 100;
+                  return (
+                    <div key={day} className="flex-1 flex flex-col items-center gap-2">
+                      <div className="w-full max-w-[30px] bg-gray-100 rounded-full relative h-24">
+                        <div 
+                          className="absolute bottom-0 w-full bg-blue-500 rounded-full transition-all"
+                          style={{ height: `${height}%` }}
+                        />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        最終学習: {subject.lastStudied ? 
-                          formatDuration(
-                            { seconds: Math.floor((Date.now() - new Date(subject.lastStudied).getTime()) / 1000) },
-                            { locale: ja }
-                          ) + '前' : 
-                          '未学習'
-                        }
-                      </p>
+                      <span className="text-xs text-gray-500">{day}</span>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 弱点分析 */}
+            {weaknesses.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="p-4 border-b">
+                  <h3 className="text-base font-semibold text-gray-900">弱点分析</h3>
+                </div>
+                <div className="divide-y">
+                  {weaknesses.slice(0, 3).map((weakness) => (
+                    <div key={weakness.topicId} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{weakness.topicName}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            エラー率: {Math.round(weakness.errorRate)}%
+                          </p>
+                        </div>
+                        <div className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                          weakness.weaknessScore > 70 
+                            ? 'bg-red-100 text-red-700'
+                            : weakness.weaknessScore > 40
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {weakness.weaknessScore > 70 ? '要復習' : weakness.weaknessScore > 40 ? '注意' : '良好'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 最近の学習 */}
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b">
+                <h3 className="text-base font-semibold text-gray-900">最近の学習</h3>
+              </div>
+              <div className="divide-y">
+                {progress?.recentActivity.slice(0, 5).map((activity) => (
+                  <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {subjectLabels[activity.subject] || activity.subject}
+                          {activity.topic && ` - ${activity.topic}`}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(activity.createdAt).toLocaleString('ja-JP')}
+                        </p>
+                      </div>
+                      <div className={`w-2 h-2 rounded-full ${
+                        activity.isCorrect ? 'bg-green-500' : 'bg-red-500'
+                      }`} />
+                    </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        )}
 
-          {/* 最近の弱点（概要） */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xl">🔍 最近の弱点</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setActiveTab('weakness')}
+        {activeTab === 'subject' && (
+          <div className="space-y-4">
+            {progress?.subjects.map((subject) => (
+              <div 
+                key={subject.subject}
+                onClick={() => router.push(`/progress/${subject.subject}`)}
+                className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
               >
-                すべて見る
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <WeaknessAnalysis 
-                weakPoints={weakPoints.slice(0, 3)} 
-                recommendations={recommendations}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === 'weakness' && (
-        <WeaknessAnalysis 
-          weakPoints={weakPoints} 
-          recommendations={recommendations}
-          onActionClick={(action, weakPoint) => {
-            console.log('Action clicked:', action, weakPoint);
-            // アクションに応じた処理
-          }}
-        />
-      )}
-
-      {activeTab === 'history' && (
-        <StudyHistory 
-          sessions={studySessions}
-          onSessionClick={(session) => {
-            console.log('Session clicked:', session);
-          }}
-          onDeleteSession={(sessionId) => {
-            console.log('Delete session:', sessionId);
-          }}
-          onExport={(format, sessionIds) => {
-            console.log('Export:', format, sessionIds);
-          }}
-        />
-      )}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-gray-900 mb-2">
+                      {subjectLabels[subject.subject] || subject.subject}
+                    </h3>
+                    <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all"
+                        style={{ width: `${subject.mastery}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      習熟度: {subject.mastery}% • 最終学習: {
+                        subject.lastStudied 
+                          ? new Date(subject.lastStudied).toLocaleDateString('ja-JP')
+                          : '未学習'
+                      }
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -933,7 +933,7 @@ export default function PracticePage() {
           padding: 20px;
           max-width: 1200px;
           margin: 0 auto;
-          min-height: 100vh;
+          min-height: calc(100vh - 160px);
           background: #f8f9fa;
         }
         
@@ -1024,6 +1024,8 @@ export default function PracticePage() {
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
+            position: fixed;
+            bottom: 80px;
           box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
           animation: slideUp 0.3s ease;
         }
@@ -2048,10 +2050,13 @@ export default function PracticePage() {
           .ai-generator-panel {
             max-width: 100%;
             width: 100%;
-            height: 100vh;
-            max-height: 100vh;
-            border-radius: 0;
+            height: calc(100vh - 160px);
+            max-height: calc(100vh - 160px);
+            border-radius: 16px 16px 0 0;
+            margin-top: 60px;
             overflow-y: auto;
+            position: fixed;
+            bottom: 80px;
           }
           
           .ai-header {

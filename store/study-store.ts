@@ -402,3 +402,10 @@ export const useStudyStore = create<StudyState>((set, get) => ({
     }
   },
 }));
+// エラーハンドリングヘルパー
+export const handleError = (error: unknown, operation: string) => {
+  console.error(`${operation}でエラーが発生:`, error);
+  const message = error instanceof Error ? error.message : 'エラーが発生しました';
+  // TODO: トースト通知を表示
+  return message;
+};

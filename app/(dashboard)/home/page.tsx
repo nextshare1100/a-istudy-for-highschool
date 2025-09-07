@@ -21,6 +21,7 @@ import {
 } from '@/lib/amazon/affiliate'
 import { Settings, Sun, Moon, Clock, Bell, BookOpen, ArrowRight, Calendar, Target, Timer, ChevronRight, Brain, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { HomeProgressCards } from "@/components/home/progress-card";
 import { ja } from 'date-fns/locale'
 
 interface UserData {
@@ -2033,6 +2034,7 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="main-content">
+        <HomeProgressCards />
         <div className="greeting-section">
           <div className="greeting">
             {greeting}{userData.displayName && `、${userData.displayName}さん`}

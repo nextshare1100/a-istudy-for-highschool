@@ -42,6 +42,7 @@ export default function StudyPage() {
   const [showResult, setShowResult] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [problemStartTime, setProblemStartTime] = useState<number>(0)
   const [sessionStats, setSessionStats] = useState({
     totalProblems: 0,
