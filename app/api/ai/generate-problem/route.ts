@@ -1,7 +1,7 @@
-// app/api/ai/generate-problem/route.ts - 修正版
+// app/api/ai/generate-problem/route.ts - フォールバック対応版
 
 import { NextRequest } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient } from '@/lib/gemini/client';
 import { ExtendedParameters, ValidationChecks } from '@/types/gemini';
 
 // ========== デバッグとエラーハンドリング ==========
@@ -330,6 +330,7 @@ class ModelSelector {
     modelName: string;
     reason: string;
     estimatedCost: number;
+    enableFallback: boolean;
   } {
     const {
       subject,
@@ -342,11 +343,22 @@ class ModelSelector {
       extendedParameters
     } = request;
 
+    // 環境変数でFlashを強制する場合
+    if (process.env.GEMINI_FORCE_FLASH === 'true') {
+      return {
+        modelName: 'gemini-1.5-flash',
+        reason: 'Flash モデルが環境変数で指定されています',
+        estimatedCost: 0.0003,
+        enableFallback: true
+      };
+    }
+
     if (shouldExcludeAudioProblems(subject, topic)) {
       return {
         modelName: 'gemini-1.5-flash',
         reason: '音声問題のためテキストベースの代替問題を生成',
-        estimatedCost: 0.0003
+        estimatedCost: 0.0003,
+        enableFallback: true
       };
     }
 
@@ -391,13 +403,15 @@ class ModelSelector {
       return {
         modelName: 'gemini-1.5-pro',
         reason: reasons.join('、') + 'のため高性能モデルを使用',
-        estimatedCost: 0.01
+        estimatedCost: 0.01,
+        enableFallback: true
       };
     } else {
       return {
         modelName: 'gemini-1.5-flash',
         reason: '標準的な問題のため高速モデルを使用',
-        estimatedCost: 0.0003
+        estimatedCost: 0.0003,
+        enableFallback: true
       };
     }
   }
@@ -1222,7 +1236,7 @@ async function validateGeneratedProblem(
   return results;
 }
 
-// ========== メインハンドラー ==========
+// ========== メインハンドラー（フォールバック対応版） ==========
 export async function POST(request: NextRequest) {
   const body = await request.json();
   
@@ -1259,7 +1273,8 @@ export async function POST(request: NextRequest) {
           model: modelDecision.modelName,
           modelReason: modelDecision.reason,
           // 拡張パラメータの使用状況を追加
-          useAdvancedCustomization: body.useAdvancedCustomization || false
+          useAdvancedCustomization: body.useAdvancedCustomization || false,
+          fallbackEnabled: modelDecision.enableFallback
         }));
         
         const apiKey = process.env.GEMINI_API_KEY;
@@ -1267,118 +1282,171 @@ export async function POST(request: NextRequest) {
           throw new Error('API key not configured');
         }
         
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-          model: modelDecision.modelName,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: isReadingComprehension ? 8192 : 4096,
-          }
-        });
+        // GeminiClientのシングルトンインスタンスを使用
+        const client = getGeminiClient();
         
         let passageData: any = null;
         let questionData: any = null;
         let validationResults: ValidationChecks | null = null;
+        let actualModelUsed: string = modelDecision.modelName;
         
-        // 長文読解の場合、まず文章を生成
+        // ========== 長文読解の場合、まず文章を生成 ==========
         if (isReadingComprehension) {
           const passagePrompt = generateOptimizedPrompt(body, modelDecision.modelName, 'passage' as any);
           debugLog('Passage prompt', passagePrompt);
           
-          const passageResult = await model.generateContent(passagePrompt);
-          const passageText = passageResult.response.text();
-          debugLog('Passage response', passageText);
-          
-          const passageJson = extractJSON(passageText);
-          
-          if (!passageJson) {
-            throw new Error('Failed to generate passage');
+          try {
+            // フォールバック対応の生成処理
+            const passageResult = await client['executeWithFallback'](
+              async (modelName: string) => {
+                actualModelUsed = modelName;
+                const model = client['genAI'].getGenerativeModel({ 
+                  model: modelName,
+                  generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 8192,
+                  }
+                });
+                const result = await model.generateContent(passagePrompt);
+                return result.response.text();
+              },
+              {
+                preferredModel: modelDecision.modelName,
+                maxRetries: 3
+              }
+            );
+            
+            debugLog('Passage response', passageResult);
+            
+            const passageJson = extractJSON(passageResult);
+            
+            if (!passageJson) {
+              throw new Error('Failed to generate passage');
+            }
+            
+            passageData = passageJson;
+            
+            controller.enqueue(encodeSSE({
+              status: 'passage_ready',
+              passageTitle: passageData.passageTitle,
+              passageText: passageData.passageText,
+              passageMetadata: passageData.passageMetadata,
+              modelUsed: actualModelUsed
+            }));
+          } catch (error) {
+            debugLog('Passage generation error', error);
+            throw error;
           }
-          
-          passageData = passageJson;
-          
-          controller.enqueue(encodeSSE({
-            status: 'passage_ready',
-            passageTitle: passageData.passageTitle,
-            passageText: passageData.passageText,
-            passageMetadata: passageData.passageMetadata
-          }));
         }
         
-        // 問題文の生成（拡張カスタマイズ対応）
+        // ========== 問題文の生成（拡張カスタマイズ対応） ==========
         const questionPrompt = body.useAdvancedCustomization && body.extendedParameters
           ? generateStructuredPrompt(body, modelDecision.modelName, passageData)
           : generateOptimizedPrompt(body, modelDecision.modelName, 'question', passageData);
         debugLog('Question prompt', questionPrompt);
         
-        const questionResult = await model.generateContent(questionPrompt);
-        const questionText = questionResult.response.text();
-        debugLog('Question response', questionText);
-        
-        const questionJson = extractJSON(questionText);
-        
-        if (!questionJson) {
-          debugLog('Failed to extract JSON from response', questionText);
-          throw new Error('Failed to extract question JSON');
+        try {
+          // フォールバック対応の生成処理
+          const questionResult = await client['executeWithFallback'](
+            async (modelName: string) => {
+              actualModelUsed = modelName;
+              const model = client['genAI'].getGenerativeModel({ 
+                model: modelName,
+                generationConfig: {
+                  temperature: 0.7,
+                  maxOutputTokens: isReadingComprehension ? 8192 : 4096,
+                }
+              });
+              const result = await model.generateContent(questionPrompt);
+              return result.response.text();
+            },
+            {
+              preferredModel: modelDecision.modelName,
+              maxRetries: 3
+            }
+          );
+          
+          debugLog('Question response', questionResult);
+          
+          const questionJson = extractJSON(questionResult);
+          
+          if (!questionJson) {
+            debugLog('Failed to extract JSON from response', questionResult);
+            throw new Error('Failed to extract question JSON');
+          }
+          
+          debugLog('Extracted question JSON', questionJson);
+          
+          // バリデーション
+          const validation = ResponseValidator.validateQuestionData(questionJson);
+          if (!validation.isValid) {
+            debugLog('Validation failed', { validation, questionJson });
+            throw new Error(`Question validation failed: ${validation.error}`);
+          }
+          
+          questionData = questionJson;
+          
+          // 拡張パラメータ使用時の検証
+          if (body.useAdvancedCustomization && body.extendedParameters) {
+            validationResults = await validateGeneratedProblem(questionData, body);
+            debugLog('Validation results', validationResults);
+          }
+          
+          // Canvas必要性の判定
+          const canvasDetection = CanvasDetector.needsCanvas(
+            body.subject,
+            body.topic,
+            body.problemType,
+            questionData.question
+          );
+          
+          const needsCanvas = body.includeCanvas || canvasDetection.needed;
+          
+          // 問題文をSSEで送信
+          const sseData = {
+            status: 'question_ready',
+            question: questionData.question,
+            needsCanvas,
+            canvasType: canvasDetection.canvasType,
+            modelUsed: actualModelUsed,
+            ...(questionData.format && { format: questionData.format }),
+            ...(questionData.formulaType && { formulaType: questionData.formulaType }),
+            ...(questionData.vocabularyType && { vocabularyType: questionData.vocabularyType }),
+            ...(questionData.targetWord && { targetWord: questionData.targetWord }),
+            ...(questionData.educationalMetadata && { educationalMetadata: questionData.educationalMetadata })
+          };
+          
+          debugLog('Sending question_ready SSE', sseData);
+          controller.enqueue(encodeSSE(sseData));
+        } catch (error) {
+          debugLog('Question generation error', error);
+          throw error;
         }
         
-        debugLog('Extracted question JSON', questionJson);
-        
-        // バリデーション
-        const validation = ResponseValidator.validateQuestionData(questionJson);
-        if (!validation.isValid) {
-          debugLog('Validation failed', { validation, questionJson });
-          throw new Error(`Question validation failed: ${validation.error}`);
-        }
-        
-        questionData = questionJson;
-        
-        // 拡張パラメータ使用時の検証
-        if (body.useAdvancedCustomization && body.extendedParameters) {
-          validationResults = await validateGeneratedProblem(questionData, body);
-          debugLog('Validation results', validationResults);
-        }
-        
-        // Canvas必要性の判定
-        const canvasDetection = CanvasDetector.needsCanvas(
-          body.subject,
-          body.topic,
-          body.problemType,
-          questionData.question
-        );
-        
-        const needsCanvas = body.includeCanvas || canvasDetection.needed;
-        
-        // 問題文をSSEで送信
-        const sseData = {
-          status: 'question_ready',
-          question: questionData.question,
-          needsCanvas,
-          canvasType: canvasDetection.canvasType,
-          ...(questionData.format && { format: questionData.format }),
-          ...(questionData.formulaType && { formulaType: questionData.formulaType }),
-          ...(questionData.vocabularyType && { vocabularyType: questionData.vocabularyType }),
-          ...(questionData.targetWord && { targetWord: questionData.targetWord }),
-          ...(questionData.educationalMetadata && { educationalMetadata: questionData.educationalMetadata })
-        };
-        
-        debugLog('Sending question_ready SSE', sseData);
-        controller.enqueue(encodeSSE(sseData));
-        
-        // Canvasデータを生成（必要な場合）
+        // ========== Canvasデータを生成（必要な場合） ==========
         let canvasData = null;
-        if (needsCanvas && !shouldExcludeAudioProblems(body.subject, body.topic)) {
+        if (questionData && CanvasDetector.needsCanvas(body.subject, body.topic, body.problemType, questionData.question).needed && !shouldExcludeAudioProblems(body.subject, body.topic)) {
           try {
             const canvasPrompt = generateCanvasPrompt(
               body,
               questionData,
-              canvasDetection.canvasType || 'coordinate'
+              CanvasDetector.needsCanvas(body.subject, body.topic, body.problemType, questionData.question).canvasType || 'coordinate'
             );
             debugLog('Canvas prompt', canvasPrompt);
             
-            const canvasResult = await model.generateContent(canvasPrompt);
-            const canvasText = canvasResult.response.text();
-            const canvasJson = extractJSON(canvasText);
+            const canvasResult = await client['executeWithFallback'](
+              async (modelName: string) => {
+                const model = client['genAI'].getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(canvasPrompt);
+                return result.response.text();
+              },
+              {
+                preferredModel: actualModelUsed,
+                maxRetries: 2
+              }
+            );
+            
+            const canvasJson = extractJSON(canvasResult);
             
             if (canvasJson) {
               canvasData = canvasJson;
@@ -1398,9 +1466,11 @@ export async function POST(request: NextRequest) {
             }
           } catch (canvasError) {
             debugLog('Canvas generation error', canvasError);
+            // Canvas生成エラーは無視して続行
           }
         }
         
+        // ========== 選択肢・答えの生成 ==========
         let answer = '';
         let options = undefined;
         
@@ -1413,9 +1483,16 @@ export async function POST(request: NextRequest) {
           });
           debugLog('Options prompt', optionsPrompt);
           
-          const optionsResult = await model.generateContent(optionsPrompt);
-          const optionsText = optionsResult.response.text();
-          const optionsJson = extractJSON(optionsText);
+          const optionsResult = await client['executeWithFallback'](
+            async (modelName: string) => {
+              const model = client['genAI'].getGenerativeModel({ model: modelName });
+              const result = await model.generateContent(optionsPrompt);
+              return result.response.text();
+            },
+            { preferredModel: actualModelUsed }
+          );
+          
+          const optionsJson = extractJSON(optionsResult);
           
           if (optionsJson) {
             options = optionsJson.options;
@@ -1450,9 +1527,16 @@ export async function POST(request: NextRequest) {
           
           debugLog('Options prompt for multiple choice', optionsPrompt);
           
-          const optionsResult = await model.generateContent(optionsPrompt);
-          const optionsText = optionsResult.response.text();
-          const optionsJson = extractJSON(optionsText);
+          const optionsResult = await client['executeWithFallback'](
+            async (modelName: string) => {
+              const model = client['genAI'].getGenerativeModel({ model: modelName });
+              const result = await model.generateContent(optionsPrompt);
+              return result.response.text();
+            },
+            { preferredModel: actualModelUsed }
+          );
+          
+          const optionsJson = extractJSON(optionsResult);
           
           if (optionsJson) {
             options = optionsJson.options;
@@ -1477,9 +1561,16 @@ export async function POST(request: NextRequest) {
           });
           debugLog('Answer prompt', answerPrompt);
           
-          const answerResult = await model.generateContent(answerPrompt);
-          const answerText = answerResult.response.text();
-          const answerJson = extractJSON(answerText);
+          const answerResult = await client['executeWithFallback'](
+            async (modelName: string) => {
+              const model = client['genAI'].getGenerativeModel({ model: modelName });
+              const result = await model.generateContent(answerPrompt);
+              return result.response.text();
+            },
+            { preferredModel: actualModelUsed }
+          );
+          
+          const answerJson = extractJSON(answerResult);
           
           if (answerJson) {
             const answerValidation = ResponseValidator.validateAnswerData(answerJson);
@@ -1497,7 +1588,7 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        // 解説の生成
+        // ========== 解説の生成 ==========
         try {
           // すべての生成済みデータをまとめる
           const allPreviousData = {
@@ -1516,9 +1607,16 @@ export async function POST(request: NextRequest) {
           );
           debugLog('Explanation prompt', explanationPrompt);
           
-          const explanationResult = await model.generateContent(explanationPrompt);
-          const explanationText = explanationResult.response.text();
-          const explanationJson = extractJSON(explanationText);
+          const explanationResult = await client['executeWithFallback'](
+            async (modelName: string) => {
+              const model = client['genAI'].getGenerativeModel({ model: modelName });
+              const result = await model.generateContent(explanationPrompt);
+              return result.response.text();
+            },
+            { preferredModel: actualModelUsed }
+          );
+          
+          const explanationJson = extractJSON(explanationResult);
           
           if (explanationJson) {
             controller.enqueue(encodeSSE({
@@ -1550,15 +1648,19 @@ export async function POST(request: NextRequest) {
           }));
         }
         
-        // 完了
+        // ========== 完了 ==========
+        const needsCanvas = questionData && CanvasDetector.needsCanvas(body.subject, body.topic, body.problemType, questionData.question).needed;
+        
         controller.enqueue(encodeSSE({
           status: 'complete',
           estimatedTime: needsCanvas ? 20 : isReadingComprehension ? 30 : 15,
           keywords: [...(passageData?.passageMetadata?.keyConcepts || []), body.topic],
-          modelUsed: modelDecision.modelName,
+          modelUsed: actualModelUsed,
           estimatedCost: modelDecision.estimatedCost,
           // 検証結果を含める
-          ...(validationResults && { validationResults })
+          ...(validationResults && { validationResults }),
+          // モデル使用状況を含める
+          modelUsageStats: client.getModelUsageStats()
         }));
         
       } catch (error) {
@@ -1582,6 +1684,11 @@ export async function POST(request: NextRequest) {
             errorMessage = '本日の利用上限に達しました。明日再度お試しください。';
           } else if (error.message?.includes('API key')) {
             errorMessage = 'APIキーが設定されていません。環境変数を確認してください。';
+          } else if (error.message?.includes('すべてのモデルが利用制限に達しています')) {
+            errorMessage = 'すべてのAIモデルが利用制限に達しています。しばらく待ってから再度お試しください。';
+            // モデル使用状況を含める
+            const client = getGeminiClient();
+            errorDetail = JSON.stringify(client.getModelUsageStats());
           }
         }
         
@@ -1618,4 +1725,3 @@ export async function OPTIONS(request: NextRequest) {
     }
   });
 }
-            

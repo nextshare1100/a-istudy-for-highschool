@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from 'react';
+import { Providers } from './providers';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,13 +18,15 @@ export const metadata: Metadata = {
   title: "A-IStudy",
   description: "AI学習支援サービス",
   manifest: "/manifest.json",
-  themeColor: "#667eea",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
 };
+
+export const viewport = {
+  themeColor: "#667eea",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1
+};
+
 
 export default function RootLayout({
   children,
@@ -40,9 +43,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Suspense fallback={<div>Loading...</div>}>
-          {children}
-        </Suspense>
+        <Providers>
+          <Suspense fallback={<div>Loading...</div>}>
+            {children}
+          </Suspense>
+        </Providers>
       </body>
     </html>
   );
