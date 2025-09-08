@@ -74,13 +74,13 @@ interface StudySession {
 }
 
 // ========== ユーザープロファイル関連 ==========
-export async function getUserProfile(userId: string) {
+export const getUserProfile = async(userId: string) {
   const docRef = doc(db, 'users', userId);
   const docSnap = await getDoc(docRef);
   return docSnap.exists() ? docSnap.data() : null;
 }
 
-export async function updateUserProfile(userId: string, data: any) {
+export const updateUserProfile = async(userId: string, data: any) {
   const docRef = doc(db, 'users', userId);
   await updateDoc(docRef, {
     ...data,
@@ -88,7 +88,7 @@ export async function updateUserProfile(userId: string, data: any) {
   });
 }
 
-export async function createUserProfile(userId: string, data: any) {
+export const createUserProfile = async(userId: string, data: any) {
   const docRef = doc(db, 'users', userId);
   await setDoc(docRef, {
     ...data,
@@ -98,7 +98,7 @@ export async function createUserProfile(userId: string, data: any) {
 }
 
 // ========== タイマーセッション関連 ==========
-export async function getRecentTimerSessions(userId: string, limitCount: number = 10) {
+export const getRecentTimerSessions = async(userId: string, limitCount: number = 10) {
   const q = query(
     collection(db, 'timerSessions'),
     where('userId', '==', userId),
@@ -125,7 +125,7 @@ export async function getRecentTimerSessions(userId: string, limitCount: number 
   });
 }
 
-export async function startTimerSessionWithContent(userId: string, content: any) {
+export async const startTimerSessionWithContent = async (userId: string, content: any) => {
   try {
     const docRef = await addDoc(collection(db, 'timerSessions'), {
       userId,
@@ -140,7 +140,7 @@ export async function startTimerSessionWithContent(userId: string, content: any)
   }
 }
 
-export async function toggleTimerPause(sessionId: string, isPaused: boolean) {
+export async const toggleTimerPause = async (sessionId: string, isPaused: boolean) => {
   try {
     const docRef = doc(db, 'timerSessions', sessionId);
     await updateDoc(docRef, { 
@@ -154,7 +154,7 @@ export async function toggleTimerPause(sessionId: string, isPaused: boolean) {
   }
 }
 
-export async function recordBreak(sessionId: string, breakData: any) {
+export async const recordBreak = async (sessionId: string, breakData: any) => {
   try {
     const docRef = doc(db, 'timerSessions', sessionId);
     await updateDoc(docRef, {
@@ -168,7 +168,7 @@ export async function recordBreak(sessionId: string, breakData: any) {
   }
 }
 
-export async function updateStudyContent(sessionId: string, content: any) {
+export async const updateStudyContent = async (sessionId: string, content: any) => {
   try {
     const docRef = doc(db, 'timerSessions', sessionId);
     await updateDoc(docRef, {
@@ -182,7 +182,7 @@ export async function updateStudyContent(sessionId: string, content: any) {
   }
 }
 
-export async function endTimerSessionWithFeedback(sessionId: string, feedback: any) {
+export async const endTimerSessionWithFeedback = async (sessionId: string, feedback: any) => {
   try {
     const docRef = doc(db, 'timerSessions', sessionId);
     await updateDoc(docRef, {
@@ -197,7 +197,7 @@ export async function endTimerSessionWithFeedback(sessionId: string, feedback: a
   }
 }
 
-export async function submitStudyFeedback(sessionId: string, feedback: any) {
+export async const submitStudyFeedback = async (sessionId: string, feedback: any) => {
   try {
     const docRef = doc(db, 'timerSessions', sessionId);
     await updateDoc(docRef, {
@@ -250,7 +250,7 @@ export async function getStudySessions(
   });
 }
 
-export async function getWeaknessAnalysis(userId: string) {
+export async const getWeaknessAnalysis = async (userId: string) => {
   const sessions = await getStudySessions(userId);
   
   const topicStats = new Map();
@@ -295,7 +295,7 @@ export async function getWeaknessAnalysis(userId: string) {
   return weaknesses;
 }
 
-function calculateWeaknessScore(stats: any): number {
+const calculateWeaknessScore = async (stats: any) =>: number {
   const errorWeight = 0.5;
   const frequencyWeight = 0.3;
   const recencyWeight = 0.2;
@@ -312,7 +312,7 @@ function calculateWeaknessScore(stats: any): number {
   );
 }
 
-export async function calculateStudyMetrics(userId: string) {
+export async const calculateStudyMetrics = async (userId: string) => {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -345,7 +345,7 @@ export async function calculateStudyMetrics(userId: string) {
   };
 }
 
-async function calculateStudyStreak(userId: string): Promise<number> {
+async const calculateStudyStreak = async (userId: string) =>: Promise<number> {
   const q = query(
     collection(db, 'studySessions'),
     where('userId', '==', userId),
@@ -381,7 +381,7 @@ async function calculateStudyStreak(userId: string): Promise<number> {
 }
 
 // ========== 模擬試験関連 ==========
-export async function getMockExamResults(userId: string) {
+export async const getMockExamResults = async (userId: string) => {
   const q = query(
     collection(db, 'mockExams'),
     where('userId', '==', userId),
@@ -391,7 +391,7 @@ export async function getMockExamResults(userId: string) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-export async function saveMockExamResult(data: any) {
+export async const saveMockExamResult = async (data: any) => {
   const docRef = await addDoc(collection(db, 'mockExams'), {
     ...data,
     createdAt: serverTimestamp()
@@ -399,36 +399,36 @@ export async function saveMockExamResult(data: any) {
   return docRef.id;
 }
 
-export async function deleteMockExamResult(examId: string) {
+export async const deleteMockExamResult = async (examId: string) => {
   await deleteDoc(doc(db, 'mockExams', examId));
 }
 
-export async function getMockExamGoals(userId: string) {
+export async const getMockExamGoals = async (userId: string) => {
   const docRef = doc(db, 'mockExamGoals', userId);
   const docSnap = await getDoc(docRef);
   return docSnap.exists() ? docSnap.data() : null;
 }
 
-export async function saveMockExamGoals(userId: string, goals: any) {
+export async const saveMockExamGoals = async (userId: string, goals: any) => {
   const docRef = doc(db, 'mockExamGoals', userId);
   await setDoc(docRef, goals, { merge: true });
 }
 
-export async function analyzeMockExamGrowth(userId: string) {
+export async const analyzeMockExamGrowth = async (userId: string) => {
   const results = await getMockExamResults(userId);
   // TODO: 成長分析ロジックの実装
   return { growth: 0, trend: 'stable' };
 }
 
 // ========== その他の関数 ==========
-export async function getProblems(filters: any) {
+export async const getProblems = async (filters: any) => {
   const constraints = Object.entries(filters).map(([k, v]) => where(k, '==', v));
   const q = query(collection(db, 'problems'), ...constraints);
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-export async function getEssaySubmissions(userId: string) {
+export async const getEssaySubmissions = async (userId: string) => {
   const q = query(
     collection(db, 'essays'),
     where('userId', '==', userId),
@@ -438,7 +438,7 @@ export async function getEssaySubmissions(userId: string) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-export async function getQuizResults(userId: string) {
+export async const getQuizResults = async (userId: string) => {
   const q = query(
     collection(db, 'quizResults'),
     where('userId', '==', userId),
@@ -448,7 +448,7 @@ export async function getQuizResults(userId: string) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-export async function saveTermsAgreement(userId: string, agreementData: any) {
+export async const saveTermsAgreement = async (userId: string, agreementData: any) => {
   const docRef = doc(db, 'termsAgreements', userId);
   await setDoc(docRef, {
     ...agreementData,
