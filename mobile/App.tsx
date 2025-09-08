@@ -248,7 +248,7 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://192.168.10.118:3000' }}
+        source={{ uri: 'https://a-istudy-for-highschool.vercel.app' }}
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           setIsLoading(false);
