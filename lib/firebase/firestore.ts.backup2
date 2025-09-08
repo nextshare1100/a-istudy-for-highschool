@@ -106,23 +106,7 @@ export async function getRecentTimerSessions(userId: string, limitCount: number 
     limit(limitCount)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      // 必須フィールドのマッピング
-      startTime: data.startTime || serverTimestamp(),
-      endTime: data.endTime || null,
-      elapsedSeconds: data.elapsedSeconds || data.duration || 0,
-      focusScore: data.focusScore || 85,
-      breaks: data.breaks || 0,
-      content: data.content || null,
-      feedback: data.feedback || null,
-      subjectId: data.subjectId || '',
-      unitId: data.unitId || ''
-    };
-  });
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 export async function startTimerSessionWithContent(userId: string, content: any) {

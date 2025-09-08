@@ -1,3 +1,4 @@
+//App.tsx
 import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, Alert, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -247,7 +248,7 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://d8907f45b85e.ngrok-free.app' }}
+        source={{ uri: 'https://192.168.10.118:3000' }}
         onMessage={handleWebViewMessage}
         onLoadEnd={() => {
           setIsLoading(false);
