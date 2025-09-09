@@ -86,3 +86,4 @@ jest.setup.js
 # 一時ファイル
 *.patch
 
+*.backup*
