@@ -1,4 +1,3 @@
-//app/subscription/onboarding/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,32 +13,42 @@ import {
   Loader2,
   Shield,
   Clock,
-  CreditCard
+  CreditCard,
+  X
 } from 'lucide-react';
 
 export default function SubscriptionOnboardingPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasActiveSubscription, isInTrial } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productInfo, setProductInfo] = useState<any>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     // ユーザーがログインしていない場合はログイン画面へ
     if (!user) {
-      router.push('/login');
+      router.push('/login?redirect=/subscription/onboarding');
+      return;
+    }
+
+    // 既にサブスクリプションを持っている場合はホームへ
+    if (hasActiveSubscription || isInTrial) {
+      router.push('/home');
       return;
     }
 
     // Web環境の場合は別の決済フローへ
     if (!Capacitor.isNativePlatform()) {
-      router.push('/subscription/web');
+      // 現在はWebでの決済は未実装のため、エラーメッセージを表示
+      setError('現在、Webブラウザからの購入はサポートされていません。iOSまたはAndroidアプリをご利用ください。');
+      setIsInitializing(false);
       return;
     }
 
     // 製品情報を取得
     loadProductInfo();
-  }, [user, router]);
+  }, [user, hasActiveSubscription, isInTrial, router]);
 
   const loadProductInfo = async () => {
     try {
@@ -48,6 +57,9 @@ export default function SubscriptionOnboardingPage() {
       setProductInfo(info);
     } catch (error) {
       console.error('Failed to load product info:', error);
+      setError('製品情報の取得に失敗しました。アプリを再起動してお試しください。');
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -62,7 +74,7 @@ export default function SubscriptionOnboardingPage() {
         // 購入成功 - ホーム画面へ
         router.push('/home?welcome=true');
       } else if (result.cancelled) {
-        setError('購入がキャンセルされました。サービスを利用するには登録が必要です。');
+        setError('サービスをご利用いただくには、プレミアムプランへの登録が必要です。');
       }
     } catch (error: any) {
       setError(error.message || '購入処理中にエラーが発生しました');
@@ -70,6 +82,21 @@ export default function SubscriptionOnboardingPage() {
       setLoading(false);
     }
   };
+
+  // 初期化中の画面
+  if (isInitializing) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Loader2 style={{ width: '48px', height: '48px', animation: 'spin 1s linear infinite', color: '#3b82f6' }} />
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -89,12 +116,13 @@ export default function SubscriptionOnboardingPage() {
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
         overflow: 'hidden'
       }}>
-        {/* ヘッダー */}
+        {/* ヘッダー - スキップボタンなし（必須登録） */}
         <div style={{
           background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
           padding: '2rem',
           textAlign: 'center',
-          color: 'white'
+          color: 'white',
+          position: 'relative'
         }}>
           <Crown style={{ width: '48px', height: '48px', margin: '0 auto 1rem' }} />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
@@ -102,6 +130,23 @@ export default function SubscriptionOnboardingPage() {
           </h1>
           <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>
             AIの力で学習効率を最大化
+          </p>
+        </div>
+
+        {/* 必須登録の通知 */}
+        <div style={{
+          backgroundColor: '#fef3c7',
+          padding: '1rem',
+          borderBottom: '1px solid #fde68a'
+        }}>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#92400e',
+            margin: 0,
+            textAlign: 'center',
+            fontWeight: '600'
+          }}>
+            ⚠️ サービスご利用にはプレミアムプランへの登録が必要です
           </p>
         </div>
 
@@ -238,17 +283,17 @@ export default function SubscriptionOnboardingPage() {
           {/* CTAボタン */}
           <button
             onClick={handleStartTrial}
-            disabled={loading}
+            disabled={loading || !!error}
             style={{
               width: '100%',
               padding: '1rem',
-              backgroundColor: loading ? '#9ca3af' : '#3b82f6',
+              backgroundColor: loading || !!error ? '#9ca3af' : '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '0.5rem',
               fontSize: '1rem',
               fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: loading || !!error ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -257,12 +302,12 @@ export default function SubscriptionOnboardingPage() {
               marginBottom: '1rem'
             }}
             onMouseEnter={(e) => {
-              if (!loading) {
+              if (!loading && !error) {
                 e.currentTarget.style.backgroundColor = '#2563eb';
               }
             }}
             onMouseLeave={(e) => {
-              if (!loading) {
+              if (!loading && !error) {
                 e.currentTarget.style.backgroundColor = '#3b82f6';
               }
             }}
@@ -298,16 +343,30 @@ export default function SubscriptionOnboardingPage() {
             </p>
           </div>
 
-          {/* 注意事項 */}
-          <p style={{
-            fontSize: '0.688rem',
-            color: '#9ca3af',
+          {/* ログアウトオプション */}
+          <div style={{
             textAlign: 'center',
-            margin: 0,
-            lineHeight: '1.4'
+            marginTop: '1.5rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid #e5e7eb'
           }}>
-            登録を完了しないとサービスをご利用いただけません
-          </p>
+            <button
+              onClick={() => {
+                // ログアウト処理
+                router.push('/logout');
+              }}
+              style={{
+                color: '#6b7280',
+                fontSize: '0.813rem',
+                textDecoration: 'underline',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              別のアカウントでログイン
+            </button>
+          </div>
         </div>
       </div>
 

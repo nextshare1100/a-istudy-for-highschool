@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase/config'
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
 import { toast } from '@/components/ui/use-toast'
 import { Loader2, Mail, Lock, AlertCircle, Eye, EyeOff, ArrowRight } from 'lucide-react'
@@ -34,7 +34,7 @@ export function LoginForm() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // スタイル定義（変更なし）
+  // スタイル定義
   const styles = {
     form: {
       display: 'flex',
@@ -194,17 +194,32 @@ export function LoginForm() {
         console.error('最終ログイン更新エラー:', error)
       }
       
-      // 決済システムを削除したため、直接ホーム画面へ遷移
-      console.log('ホーム画面へリダイレクト:', intendedRedirect)
-      toast({
-        title: 'ログインしました',
-        description: 'ホーム画面へ移動します',
-      })
+      // サブスクリプション状態をチェック
+      console.log('サブスクリプション状態を確認中...')
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      const userData = userDoc.data()
+      const subscription = userData?.subscription
       
-      // 少し遅延を入れて認証状態が確実に更新されるようにする
-      setTimeout(() => {
-        router.push(intendedRedirect);
-      }, 100);
+      const hasActiveSubscription = subscription?.isActive || false
+      const isInTrial = subscription?.isInTrial || false
+      
+      if (!hasActiveSubscription && !isInTrial) {
+        // サブスクリプションがない場合は強制的にオンボーディングへ
+        console.log('サブスクリプションなし → オンボーディングへリダイレクト')
+        toast({
+          title: 'プレミアムプランへの登録が必要です',
+          description: '30日間の無料トライアルをお試しください',
+        })
+        router.push('/subscription/onboarding')
+      } else {
+        // サブスクリプションがある場合は通常のリダイレクト
+        console.log('サブスクリプション確認済み → ホームへリダイレクト')
+        toast({
+          title: 'ログインしました',
+          description: 'ホーム画面へ移動します',
+        })
+        router.push(intendedRedirect)
+      }
       
     } catch (err: any) {
       console.error('Login error:', err)

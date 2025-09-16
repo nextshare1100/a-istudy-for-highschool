@@ -1,65 +1,103 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { 
   User,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut as firebaseSignOut
 } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, Unsubscribe } from 'firebase/firestore'
+import { useRouter, usePathname } from 'next/navigation'
+import { setCookie, deleteCookie } from 'cookies-next'
 
 interface UserData {
-  email?: string;
-  displayName?: string;
-  subscriptionStatus?: 'free' | 'premium' | 'corporate';
-  corporateId?: string;
-  corporateCompanyName?: string;
-  corporateActivatedAt?: string;
-  corporateExpiredAt?: string;
-  role?: string;
-  [key: string]: any;
+  uid: string
+  email: string
+  displayName: string
+  grade?: string
+  school?: string
+  subjects?: string[]
+  aspirations?: string[]
+  photoURL?: string
+  subscriptionStatus?: 'free' | 'premium' | 'corporate'
+  corporateId?: string
+  corporateExpired?: boolean
+  dailyChallenges?: {
+    [date: string]: any
+  }
+  studyStats?: {
+    currentStreak?: number
+    longestStreak?: number
+    lastActiveDate?: any
+    totalStudyTime?: number
+    subjectProgress?: {
+      [subject: string]: number
+    }
+  }
+  subscription?: {
+    isActive: boolean
+    isInTrial: boolean
+    status: 'active' | 'trial' | 'expired' | 'cancelled' | 'none'
+    expirationDate?: any
+    autoRenewing?: boolean
+    platform?: 'ios' | 'android' | 'web'
+    productId?: string
+  }
 }
 
 interface AuthContextType {
   user: User | null
   userData: UserData | null
   loading: boolean
-  isAdmin: boolean
-  isPremium: boolean
-  isCorporate: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
+  error: string | null
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refreshUserData: () => Promise<void>
+  isPremium: boolean
+  isCorporate: boolean
+  hasActiveSubscription: boolean
+  isInTrial: boolean
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  userData: null,
+  loading: true,
+  error: null,
+  login: async () => {},
+  logout: async () => {},
+  refreshUserData: async () => {},
+  isPremium: false,
+  isCorporate: false,
+  hasActiveSubscription: false,
+  isInTrial: false
+})
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
 
-  // ユーザーデータを取得する関数
+  // ユーザーデータの取得
   const fetchUserData = async (uid: string): Promise<UserData | null> => {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid))
       if (userDoc.exists()) {
         const data = userDoc.data() as UserData
         
-        // 法人契約の有効性を確認
+        // 企業ユーザーの有効期限チェック
         if (data.subscriptionStatus === 'corporate' && data.corporateId) {
-          const contractDoc = await getDoc(doc(db, 'corporate_contracts', data.corporateId))
-          if (contractDoc.exists()) {
-            const contractData = contractDoc.data()
+          const corporateDoc = await getDoc(doc(db, 'corporates', data.corporateId))
+          if (corporateDoc.exists()) {
+            const corporate = corporateDoc.data()
+            const now = new Date()
+            const expiredAt = corporate.expiredAt?.toDate() || null
             
-            // 契約が期限切れの場合
-            if (contractData.status === 'expired' || 
-                new Date(contractData.contractEndDate) < new Date()) {
-              // ステータスは更新しないが、フラグを立てる
+            if (expiredAt && expiredAt < now) {
               data.corporateExpired = true
             }
           }
@@ -74,58 +112,100 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ユーザーデータをリアルタイムで監視
+  // 認証状態の監視
   useEffect(() => {
-    if (!user) {
-      setUserData(null)
-      return
-    }
-
-    const unsubscribe = onSnapshot(
-      doc(db, 'users', user.uid),
-      (doc) => {
-        if (doc.exists()) {
-          setUserData(doc.data() as UserData)
-        }
-      },
-      (error) => {
-        console.error('Error listening to user data:', error)
-      }
-    )
-
-    return () => unsubscribe()
-  }, [user])
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true)
       
-      if (user) {
-        const data = await fetchUserData(user.uid)
+      if (firebaseUser) {
+        setUser(firebaseUser)
+        setCookie('auth-token', firebaseUser.uid, { maxAge: 60 * 60 * 24 * 30 })
+        
+        const data = await fetchUserData(firebaseUser.uid)
         setUserData(data)
       } else {
+        setUser(null)
         setUserData(null)
+        deleteCookie('auth-token')
       }
       
       setLoading(false)
     })
 
-    return unsubscribe
+    return () => unsubscribeAuth()
   }, [])
 
-  const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password)
+  // ユーザーデータのリアルタイム監視
+  useEffect(() => {
+    let unsubscribeFirestore: Unsubscribe | null = null
+    
+    if (user) {
+      unsubscribeFirestore = onSnapshot(
+        doc(db, 'users', user.uid),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            setUserData(snapshot.data() as UserData)
+          }
+        },
+        (error) => {
+          console.error('Error listening to user data:', error)
+          setError('ユーザーデータの取得に失敗しました')
+        }
+      )
+    }
+
+    return () => {
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore()
+      }
+    }
+  }, [user])
+
+  // サブスクリプションチェックとリダイレクト
+  useEffect(() => {
+    if (!loading && user && userData) {
+      const subscription = userData.subscription
+      const hasActiveSubscription = subscription?.isActive || false
+      const isInTrial = subscription?.isInTrial || false
+      
+      // サブスクリプション関連のパスは除外
+      const isSubscriptionPath = pathname === '/subscription/onboarding' || 
+                               pathname === '/account/subscription'
+      
+      // 認証関連のパスは除外
+      const isAuthPath = pathname === '/login' || 
+                        pathname === '/register' ||
+                        pathname === '/forgot-password' ||
+                        pathname === '/reset-password'
+      
+      // サブスクリプションがない場合は強制リダイレクト
+      if (!hasActiveSubscription && !isInTrial && !isSubscriptionPath && !isAuthPath) {
+        console.log('No active subscription, redirecting to onboarding')
+        router.push('/subscription/onboarding')
+      }
+    }
+  }, [user, userData, loading, pathname, router])
+
+  // ログイン
+  const login = async (email: string, password: string) => {
+    // Firebase AuthのsignInWithEmailAndPasswordは
+    // 自動的にonAuthStateChangedをトリガーするので
+    // ここでは特に何もしない
   }
 
-  const signUp = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password)
-  }
-
+  // ログアウト
   const logout = async () => {
-    await signOut(auth)
-    setUserData(null)
+    try {
+      await firebaseSignOut(auth)
+      deleteCookie('auth-token')
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      setError('ログアウトに失敗しました')
+    }
   }
 
+  // ユーザーデータの再取得
   const refreshUserData = async () => {
     if (user) {
       const data = await fetchUserData(user.uid)
@@ -133,22 +213,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // 便利なゲッター
-  const isAdmin = userData?.role === 'admin'
-  const isPremium = userData?.subscriptionStatus === 'premium' || userData?.subscriptionStatus === 'corporate'
+  // サブスクリプション状態の計算
+  const subscription = userData?.subscription
+  const hasActiveSubscription = subscription?.isActive || false
+  const isInTrial = subscription?.isInTrial || false
+  const isPremium = hasActiveSubscription && !isInTrial
   const isCorporate = userData?.subscriptionStatus === 'corporate' && !userData?.corporateExpired
 
   const value = {
     user,
     userData,
     loading,
-    isAdmin,
+    error,
+    login,
+    logout,
+    refreshUserData,
     isPremium,
     isCorporate,
-    signIn,
-    signUp,
-    logout,
-    refreshUserData
+    hasActiveSubscription,
+    isInTrial
   }
 
   return (
@@ -158,10 +241,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider')
   }
   return context
 }
