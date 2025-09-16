@@ -21,13 +21,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Capacitor環境での認証タイムアウト処理
+    const authTimeout = setTimeout(() => {
+      if (loading) {
+        console.log('Auth timeout - setting loading to false');
+        setLoading(false);
+      }
+    }, 5000); // 5秒でタイムアウト
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user?.uid || 'null');
       setUser(user);
       setLoading(false);
+      clearTimeout(authTimeout);
+    }, (error) => {
+      console.error('Auth error:', error);
+      setLoading(false);
+      clearTimeout(authTimeout);
     });
 
-    return unsubscribe;
-  }, []);
+    return () => {
+      unsubscribe();
+      clearTimeout(authTimeout);
+    };
+  }, [loading]);
 
   const value = {
     user,

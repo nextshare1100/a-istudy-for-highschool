@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">a-istudy for highschool</string>
+    <string name="title_activity_main">a-istudy for highschool</string>
+    <string name="package_name">com.nextshare.a_istudy_for_high</string>
+    <string name="custom_url_scheme">com.nextshare.a_istudy_for_high</string>
+</resources>

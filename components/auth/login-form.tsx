@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase/config'
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
@@ -162,6 +161,12 @@ export function LoginForm() {
       textDecoration: 'none',
       fontWeight: '500',
       transition: 'color 0.2s',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: 0,
+      textAlign: 'right' as const,
+      width: '100%',
     },
     forgotPasswordLinkHover: {
       color: '#2563eb',
@@ -196,8 +201,10 @@ export function LoginForm() {
         description: 'ホーム画面へ移動します',
       })
       
-      // 強制的にページを再読み込みして認証状態を確実に反映
-      window.location.href = intendedRedirect
+      // 少し遅延を入れて認証状態が確実に更新されるようにする
+      setTimeout(() => {
+        router.push(intendedRedirect);
+      }, 100);
       
     } catch (err: any) {
       console.error('Login error:', err)
@@ -324,8 +331,12 @@ export function LoginForm() {
             </button>
           </div>
           <div style={styles.forgotPassword}>
-            <Link
-              href="/forgot-password"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/forgot-password');
+              }}
               style={{
                 ...styles.forgotPasswordLink,
                 ...(hoveredButton === 'forgot' ? styles.forgotPasswordLinkHover : {}),
@@ -334,7 +345,7 @@ export function LoginForm() {
               onMouseLeave={() => setHoveredButton(null)}
             >
               パスワードを忘れた方
-            </Link>
+            </button>
           </div>
         </div>
 

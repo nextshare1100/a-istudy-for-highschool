@@ -21,8 +21,10 @@ import {
 } from '@/lib/amazon/affiliate'
 import { Settings, Sun, Moon, Clock, Bell, BookOpen, ArrowRight, Calendar, Target, Timer, ChevronRight, Brain, X } from 'lucide-react'
 import { format } from 'date-fns'
-import { HomeProgressCards } from "@/components/home/progress-card";
 import { ja } from 'date-fns/locale'
+import { iapManager } from '@/lib/native-iap'
+import { Capacitor } from '@capacitor/core'
+
 
 interface UserData {
   displayName: string | null
@@ -98,6 +100,8 @@ export default function HomePage() {
   // アフィリエイト関連
   const [affiliateProducts, setAffiliateProducts] = useState<AffiliateProduct[]>([])
   const [affiliateLoading, setAffiliateLoading] = useState(true)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
+  const [showTrialBanner, setShowTrialBanner] = useState(false)
   
   // デイリーチャレンジ自動更新フック
   const {
@@ -458,6 +462,42 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
       
+          // サブスクリプション状態を確認
+          if (Capacitor.isNativePlatform()) {
+            try {
+              await iapManager.initialize();
+              const status = await iapManager.checkSubscriptionStatus();
+              
+              setSubscriptionStatus(status);
+              
+              if (!status.isActive && !status.isInTrial) {
+                router.push("/subscription/onboarding");
+                return;
+              }
+              
+              if (status.isInTrial) {
+                setShowTrialBanner(true);
+              }
+            } catch (error) {
+              console.error("IAP check failed:", error);
+              // IAPエラーの場合もオンボーディングへ
+              router.push("/subscription/onboarding");
+              return;
+            }
+            const status = await iapManager.checkSubscriptionStatus();
+            
+            setSubscriptionStatus(status);
+            
+            if (!status.isActive && !status.isInTrial) {
+              router.push("/subscription/onboarding");
+              return;
+            }
+            
+            if (status.isInTrial) {
+              setShowTrialBanner(true);
+            }
+          }
+          
       if (user) {
         try {
           const userProfile = await getUserProfile(user.uid)
@@ -2034,13 +2074,47 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="main-content">
-        <HomeProgressCards />
         <div className="greeting-section">
           <div className="greeting">
             {greeting}{userData.displayName && `、${userData.displayName}さん`}
           </div>
           <div className="date">{currentDate}</div>
         </div>
+
+        {/* トライアルバナー */}
+        {showTrialBanner && subscriptionStatus && (
+          <div style={{
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            borderRadius: "12px",
+            padding: "16px",
+            marginBottom: "16px",
+            color: "white",
+            textAlign: "center",
+            boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)"
+          }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "4px" }}>
+              🎉 無料トライアル実施中
+            </h3>
+            <p style={{ fontSize: "14px", marginBottom: "8px", opacity: 0.9 }}>
+              残り{subscriptionStatus.trialDaysLeft || 7}日間、すべての機能をお試しいただけます
+            </p>
+            <button 
+              onClick={() => router.push("/subscription")}
+              style={{
+                background: "white",
+                color: "#667eea",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "500",
+                cursor: "pointer"
+              }}
+            >
+              プランの詳細を見る
+            </button>
+          </div>
+        )}
         
         {/* Welcome Message for New Users */}
         {!userData.hasData && (
@@ -2302,7 +2376,7 @@ export default function HomePage() {
             <div className="total-time">{timeDisplay}</div>
             <div className="time-label">今日の学習時間</div>
             <div className={`streak-badge ${userData.currentStreak === 0 ? 'no-streak' : ''}`}>
-              {userData.currentStreak}日連続
+              {userData.currentStreak}日連続学習
             </div>
           </div>
         </div>

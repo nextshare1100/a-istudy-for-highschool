@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await updateProfile(user, { displayName })
       }
       
-      router.push('/onboarding')
+      router.push('/subscription/onboarding')
     } catch (error: any) {
       console.error('Sign up error:', error)
       throw new Error(getAuthErrorMessage(error.code))

@@ -1,15 +1,15 @@
-//app/(auth)/login/page.tsx
-
 'use client'
 
 import { LoginForm } from '@/components/auth/login-form';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Sparkles, BookOpen, Brain, Target, GraduationCap, TrendingUp, Users, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { collection, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [userCount, setUserCount] = useState<number>(10000);
@@ -475,8 +475,11 @@ export default function LoginPage() {
             }}>
               アカウントをお持ちでない方
             </p>
-            <Link
-              href="/register"
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/register');
+              }}
               style={{
                 ...styles.registerButton,
                 textDecoration: 'none',
@@ -492,7 +495,7 @@ export default function LoginPage() {
               <Sparkles size={12} />
               <span style={{ whiteSpace: 'nowrap' }}>新規登録して始める</span>
               <ArrowRight size={12} />
-            </Link>
+            </button>
             <div style={styles.campaignBadge}>
               <span style={styles.pulseAnimation}>
                 <span style={styles.pulseDot}></span>
@@ -645,13 +648,16 @@ export default function LoginPage() {
                 <p className={`text-sm text-gray-600 mb-4`}>
                   初めての方はこちら
                 </p>
-                <Link
-                  href="/register"
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push('/register');
+                  }}
                   className={`inline-flex items-center justify-center gap-2 px-6 py-3 text-base bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium`}
                 >
                   <Sparkles className="w-4 h-4" />
                   新規登録して始める
-                </Link>
+                </button>
                 
                 <div className="mt-4">
                   <span className={`inline-flex items-center gap-1 text-xs text-green-600 font-medium`}>
@@ -668,9 +674,25 @@ export default function LoginPage() {
           
           <p className={`text-center text-xs text-gray-500 mt-6`}>
             ログインすることで、
-            <Link href="/terms" className="underline">利用規約</Link>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/terms');
+              }}
+              className="underline bg-transparent border-none cursor-pointer p-0 text-gray-500"
+            >
+              利用規約
+            </button>
             および
-            <Link href="/privacy" className="underline">プライバシーポリシー</Link>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/privacy');
+              }}
+              className="underline bg-transparent border-none cursor-pointer p-0 text-gray-500"
+            >
+              プライバシーポリシー
+            </button>
             に同意したものとみなされます。
           </p>
         </div>

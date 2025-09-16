@@ -78,5 +78,9 @@
     <string>Light</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>音声認識機能を使用して、面接練習の音声を録音・分析します。</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>面接練習で録音した音声をテキストに変換し、フィードバックを提供します。</string>
   </dict>
 </plist>

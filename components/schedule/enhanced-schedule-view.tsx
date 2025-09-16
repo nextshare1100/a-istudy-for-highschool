@@ -29,8 +29,14 @@ export function EnhancedScheduleView({
   }, [events, userLevel, weaknessAreas])
   
   const generateDetailedContents = async () => {
+    // 0分のイベントを除外
+    const filteredEvents = events.filter(event => {
+      const duration = calculateDuration(event.startTime, event.endTime);
+      return duration > 0;
+    });
+    
     const contents = await Promise.all(
-      events.map(event => 
+      filteredEvents.map(event => 
         studyContentGenerator.generateDetailedContent(
           event,
           userLevel[event.subject || ''] || 50,
@@ -54,7 +60,9 @@ export function EnhancedScheduleView({
       {/* イベントリスト */}
       <div className="lg:col-span-2 space-y-4">
         <h2 className="text-2xl font-bold mb-4">本日の学習予定</h2>
-        {events.map((event, index) => (
+        {events
+          .filter(event => calculateDuration(event.startTime, event.endTime) > 0)
+          .map((event, index) => (
           <Card 
             key={index}
             className="cursor-pointer hover:shadow-lg transition-shadow"

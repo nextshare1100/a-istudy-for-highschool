@@ -346,7 +346,7 @@ const DATA_QUALITY_CONFIG = {
   insufficient: { bg: '#fee2e2', color: '#991b1b', label: 'データ不足' }
 }
 
-// ダミーデータ生成（データなし状態）
+// ダミーデータ生成（フォールバック用）
 const generateDummyData = () => {
   return {
     studyTimeStats: {
@@ -413,9 +413,40 @@ const useWindowSize = () => {
   }
 }
 
+// カスタムフック: Firebase認証状態を安全に取得
+const useFirebaseAuth = () => {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // 動的インポートでFirebaseを読み込む
+    const initAuth = async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/auth')
+        const { onAuthStateChanged } = await import('firebase/auth')
+        
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          setUser(firebaseUser)
+          setLoading(false)
+        })
+
+        return () => unsubscribe()
+      } catch (error) {
+        console.error('Failed to load Firebase:', error)
+        setLoading(false)
+      }
+    }
+
+    initAuth()
+  }, [])
+
+  return { user, loading: loading }
+}
+
 export default function ImprovedAnalyticsPage() {
   const { isMobile, isTablet, isDesktop } = useWindowSize()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { user, loading: authLoading } = useFirebaseAuth()
   
   // Simple navigation function for demo purposes
   const navigate = (path: string) => {
@@ -428,13 +459,104 @@ export default function ImprovedAnalyticsPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [userLevel, setUserLevel] = useState('beginner')
   const [data, setData] = useState<any>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
 
+  // APIからデータを取得
   useEffect(() => {
-    setTimeout(() => {
-      setData(generateDummyData())
-      setLoading(false)
-    }, 1000)
-  }, [dateRange])
+    const fetchAnalytics = async () => {
+      // 認証の読み込み待ち
+      if (authLoading) return
+
+      setLoading(true)
+      setApiError(null)
+
+      try {
+        // 認証なしの場合はダミーデータ
+        if (!user) {
+          console.log('No authenticated user, using dummy data')
+          setData(generateDummyData())
+          setLoading(false)
+          return
+        }
+
+        // ユーザーのIDトークンを取得
+        const idToken = await user.getIdToken()
+        
+        // APIエンドポイントにリクエスト
+        const response = await fetch(`/api/analytics?range=${dateRange}&type=all&useFirebase=true`, {
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`)
+        }
+
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          // APIレスポンスをコンポーネントのデータ形式に変換
+          const formattedData = {
+            studyTimeStats: {
+              hasData: result.data.studyTime?.hasData || false,
+              todayTime: result.data.studyTime?.todayTime || 0,
+              weeklyTotal: result.data.studyTime?.weeklyTotal || 0,
+              weeklyTrend: result.data.studyTime?.weeklyTrend || [],
+              subjectDistribution: result.data.studyTime?.subjectDistribution || []
+            },
+            weaknessData: result.data.weakness || [],
+            efficiencyData: result.data.efficiency || {
+              dataQuality: 'insufficient',
+              hourlyFocus: [],
+              pomodoroComparison: {
+                userAvgFocus: 0,
+                pomodoroAvgFocus: 85,
+                recommendation: 'データが蓄積されると分析結果が表示されます'
+              },
+              breakPatterns: {
+                avgBreakInterval: 0,
+                currentPattern: 'データ不足',
+                optimalBreakDuration: 25
+              },
+              subjectEfficiency: [],
+              weeklyPatterns: []
+            },
+            predictionData: result.data.prediction || {
+              currentScore: null,
+              predictedScore: null,
+              confidenceInterval: [0, 0],
+              reliability: 'low',
+              requiredStudyHours: 0,
+              historicalData: [],
+              scenarioAnalysis: [],
+              subjectPredictions: []
+            }
+          }
+
+          // ユーザーレベルの設定
+          if (result.data.userLevel) {
+            setUserLevel(result.data.userLevel)
+          }
+
+          setData(formattedData)
+        } else {
+          // APIからデータが取得できない場合はダミーデータを使用
+          console.warn('No data from API, using dummy data')
+          setData(generateDummyData())
+        }
+      } catch (error) {
+        console.error('Failed to fetch analytics:', error)
+        // エラー時はダミーデータを使用（開発中のため）
+        setData(generateDummyData())
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [user, authLoading, dateRange])
 
   const tabs = [
     { id: 'overview', label: '概要', icon: BarChart3, color: 'blue' },
@@ -618,7 +740,7 @@ export default function ImprovedAnalyticsPage() {
     )
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div style={styles.pageContainer}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -655,6 +777,21 @@ export default function ImprovedAnalyticsPage() {
           .hide-mobile { display: none !important; }
         }
       `}</style>
+
+      {/* エラー表示 */}
+      {apiError && (
+        <div style={{
+          padding: '12px',
+          margin: '16px',
+          background: '#fee2e2',
+          color: '#991b1b',
+          borderRadius: '8px',
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          {apiError}
+        </div>
+      )}
 
       {/* ヘッダー */}
       <div style={styles.header}>
@@ -736,24 +873,6 @@ export default function ImprovedAnalyticsPage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* 模試追加ボタン */}
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      width: '100%',
-                      padding: '10px',
-                      fontSize: '14px',
-                      marginBottom: '12px',
-                    }}
-                    onClick={() => {
-                      navigate('/analytics/mock-exam')
-                      setMobileMenuOpen(false)
-                    }}
-                  >
-                    <Plus size={16} />
-                    模試追加
-                  </button>
 
                   {/* タブ */}
                   <div style={{ 
@@ -839,22 +958,6 @@ export default function ImprovedAnalyticsPage() {
                     </h1>
                   </div>
                 </div>
-                
-                <button
-                  style={styles.primaryButton}
-                  onClick={() => navigate('/analytics/mock-exam')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(147, 51, 234, 0.3)';
-                  }}
-                >
-                  <Plus size={16} />
-                  模試追加
-                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '16px', alignItems: 'center' }}>
@@ -962,7 +1065,7 @@ export default function ImprovedAnalyticsPage() {
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : 
                                    isTablet ? 'repeat(2, 1fr)' : 
-                                   'repeat(auto-fit, minmax(280px, 1fr))',
+                                   'repeat(3, 1fr)',
               gap: isMobile ? '12px' : '16px',
               marginBottom: '24px'
             }}>
@@ -987,15 +1090,6 @@ export default function ImprovedAnalyticsPage() {
                 data?.studyTimeStats?.hasData || false,
                 data?.studyTimeStats?.hasData ? '1日6時間' : '目標設定',
                 data?.studyTimeStats?.hasData ? ((data?.studyTimeStats?.todayTime || 0) / 360) * 100 : 0
-              )}
-              {renderMetricCard(
-                '連続日数',
-                '0日',
-                Calendar,
-                styles.metricCard.gradients.blue,
-                false,
-                '継続開始',
-                null
               )}
               {renderMetricCard(
                 '模試偏差値',
@@ -1033,7 +1127,7 @@ export default function ImprovedAnalyticsPage() {
                   )}
                 </div>
                 
-                {data?.studyTimeStats?.hasData ? (
+                {data?.studyTimeStats?.hasData && data?.studyTimeStats?.weeklyTrend?.length > 0 ? (
                   <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
                     <AreaChart data={data.studyTimeStats.weeklyTrend}>
                       <defs>
@@ -1233,7 +1327,7 @@ export default function ImprovedAnalyticsPage() {
                               問題数: {weakness.totalQuestions}問
                             </p>
                           </div>
-                          {renderDataQualityBadge(weakness.confidence)}
+                          {renderDataQualityBadge(weakness.confidence || 'medium')}
                         </div>
                         
                         <button

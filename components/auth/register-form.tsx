@@ -8,6 +8,7 @@ import { createUserProfile, saveTermsAgreement } from '@/lib/firebase/firestore'
 import { toast } from '@/components/ui/use-toast'
 import { GraduationCap, FileText, Lock, Mail, User, Shield, Sparkles, ChevronDown } from 'lucide-react'
 import { TERMS_OF_SERVICE } from '@/constants/terms'
+import { Capacitor } from '@capacitor/core'
 
 type Grade = '高校1年' | '高校2年' | '高校3年'
 
@@ -360,14 +361,12 @@ export function RegisterForm() {
       
       toast({
         title: '✨ アカウントを作成しました',
-        description: 'プランを選択してください',
+        description: 'サービスを利用するにはプランを選択してください',
       })
       
-      // SSR対応: windowオブジェクトの存在を確認
+      // サブスクリプション登録画面へ遷移
       setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.href = 'https://a-istudy-highschool.vercel.app/subscription/register?welcome=true';
-        }
+        router.push('/subscription/onboarding')
       }, 1500);
       
     } catch (err: any) {

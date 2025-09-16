@@ -36,7 +36,12 @@ function extractJSON(text: string): any | null {
         try {
           const parsed = JSON.parse(jsonStr);
           debugLog('Successfully parsed JSON', parsed);
-          return parsed;
+
+          // 配列の場合は最初の要素を使用
+          if (Array.isArray(parsed)) {
+            debugLog("Found array, using first element", parsed[0]);
+            return parsed[0];
+          }          return parsed;
         } catch (e) {
           debugLog('JSON parse error', { error: e, text: jsonStr });
         }

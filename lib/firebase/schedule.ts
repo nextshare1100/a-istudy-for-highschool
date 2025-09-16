@@ -1000,7 +1000,10 @@ ${goal.universityName}${goal.department}合格のための学習計画を作成�
         const studySessions: StudySession[] = [];
         let currentTime = 16;
         
-        subjects.forEach((subject, index) => {
+        // 0時間でない科目のみを処理
+      const activeSubjects = subjects.filter(subject => subjectHours[subject] > 0);
+      
+      activeSubjects.forEach((subject, index) => {
           const hours = subjectHours[subject];
           const startHour = currentTime;
           const endHour = currentTime + hours;
@@ -1042,8 +1045,8 @@ ${goal.universityName}${goal.department}合格のための学習計画を作成�
           dayOfWeek: day,
           studySessions,
           totalStudyMinutes: dailyHours * 60,
-          focusSubjects: subjects.slice(0, 2),
-          goals: this.getGradeSpecificGoals(userGrade, subjects),
+          focusSubjects: activeSubjects.slice(0, 2),
+          goals: this.getGradeSpecificGoals(userGrade, activeSubjects),
           notes: this.getGradeSpecificNotes(userGrade, day)
         };
       });
@@ -1058,7 +1061,7 @@ ${goal.universityName}${goal.department}合格のための学習計画を作成�
         gradeSpecificAdvice: this.getGradeAdvice(userGrade)
       },
       dailyPlans,
-      weeklyMilestones: this.createGradeWeeklyMilestones(userGrade, subjects),
+      weeklyMilestones: this.createGradeWeeklyMilestones(userGrade, subjects.filter(s => subjectHours[s] > 0)),
       adjustmentRules: this.getGradeAdjustmentRules(userGrade),
       detailedAnalysis: {
         weaknessBreakdown: [],
@@ -1122,7 +1125,7 @@ ${goal.universityName}${goal.department}合格のための学習計画を作成�
         breakAfter: index < subjects.length - 1
       })),
       totalStudyMinutes: dailyHours * 60,
-      focusSubjects: subjects.slice(0, 2),
+      focusSubjects: activeSubjects.slice(0, 2),
       goals: subjects.map(s => `${s}の基礎を固める`),
       notes: '計画的に学習を進める',
       date: new Date()
@@ -2119,15 +2122,15 @@ export class MonthlyScheduleManager {
     );
     
     const monthlyGoal: MonthlyGoal = {
-      scheduleId: schedule.id!,
-      year,
-      month,
-      totalHours: Math.round(totalHours),
-      subjectGoals: Object.values(subjectGoalsMap),
-      personalEvents: await this.getMonthlyEvents(year, month, schedule.userGrade),
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp
-    };
+  scheduleId: schedule.id!,
+  year,
+  month,
+  totalHours: Math.round(totalHours),
+  subjectGoals: Object.values(subjectGoalsMap).filter(goal => goal.targetHours > 0), // ここでフィルタリング
+  personalEvents: await this.getMonthlyEvents(year, month, schedule.userGrade),
+  createdAt: serverTimestamp() as Timestamp,
+  updatedAt: serverTimestamp() as Timestamp
+};
     
     const docRef = await addDoc(collection(db, 'monthlyGoals'), monthlyGoal);
     monthlyGoal.id = docRef.id;
@@ -2223,16 +2226,19 @@ export class MonthlyScheduleManager {
       });
     }
     
-    const monthlyGoal: MonthlyGoal = {
-      scheduleId: schedule.id!,
-      year,
-      month,
-      totalHours: subjectGoals.reduce((sum, goal) => sum + goal.targetHours, 0),
-      subjectGoals,
-      personalEvents: await this.getMonthlyEvents(year, month, userGrade),
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp
-    };
+    // まず、0時間の科目を除外したリストを作成
+const filteredSubjectGoals = subjectGoals.filter(goal => goal.targetHours > 0);
+
+const monthlyGoal: MonthlyGoal = {
+  scheduleId: schedule.id!,
+  year,
+  month,
+  totalHours: filteredSubjectGoals.reduce((sum, goal) => sum + goal.targetHours, 0), // フィルター後のリストで計算
+  subjectGoals: filteredSubjectGoals, // フィルター後のリストを使用
+  personalEvents: await this.getMonthlyEvents(year, month, userGrade),
+  createdAt: serverTimestamp() as Timestamp,
+  updatedAt: serverTimestamp() as Timestamp
+};
     
     const docRef = await addDoc(collection(db, 'monthlyGoals'), monthlyGoal);
     monthlyGoal.id = docRef.id;

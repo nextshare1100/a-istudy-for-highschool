@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Dialog, 
   DialogContent, 
@@ -252,7 +252,18 @@ export function StudyFeedbackForm({
     return '#8b5cf6'
   }
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 640)
+    }
+    
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
 
   return (
     <>
@@ -261,7 +272,7 @@ export function StudyFeedbackForm({
           max-width: ${isMobile ? '90%' : '420px'};
           width: ${isMobile ? '90%' : 'auto'};
           height: ${isMobile ? 'auto' : 'auto'};
-          max-height: ${isMobile ? '75vh' : '60vh'};
+          max-height: ${isMobile ? '85vh' : '60vh'};
           margin: ${isMobile ? '2vh auto' : '6rem auto 2rem'};
           padding: 0;
           border-radius: ${isMobile ? '12px' : '16px'};
@@ -305,27 +316,6 @@ export function StudyFeedbackForm({
         .section-indicator {
           display: flex;
           justify-content: center;
-          gap: ${isMobile ? '4px' : '6px'};
-          margin-top: ${isMobile ? '8px' : '12px'};
-        }
-
-        .indicator-dot {
-          width: ${isMobile ? '5px' : '6px'};
-          height: ${isMobile ? '5px' : '6px'};
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.3);
-          transition: all 0.3s ease;
-        }
-
-        .indicator-dot.active {
-          width: ${isMobile ? '16px' : '20px'};
-          border-radius: ${isMobile ? '2.5px' : '3px'};
-          background: white;
-        }
-
-        .section-indicator {
-          display: flex;
-          justify-content: center;
           gap: ${isMobile ? '6px' : '8px'};
           margin-top: ${isMobile ? '12px' : '16px'};
         }
@@ -346,8 +336,8 @@ export function StudyFeedbackForm({
 
         .feedback-body {
           padding: ${isMobile ? '12px 10px 20px' : '24px'};
-          height: ${isMobile ? 'auto' : 'auto'};
-          max-height: ${isMobile ? 'calc(75vh - 180px)' : '280px'};
+          height: auto;
+          max-height: ${isMobile ? 'calc(90vh - 160px)' : 'calc(85vh - 180px)'};
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
         }
@@ -777,8 +767,20 @@ export function StudyFeedbackForm({
       `}</style>
 
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="feedback-dialog-content">
-          <VisuallyHidden>
+        <DialogContent 
+          className="feedback-dialog-content"
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            maxWidth: isMobile ? "90%" : "420px",
+            width: isMobile ? "90%" : "420px",
+            maxHeight: isMobile ? "90vh" : "85vh",
+            margin: 0,
+            zIndex: 9999
+          }}
+        >          <VisuallyHidden>
             <DialogHeader>
               <DialogTitle>学習フィードバック</DialogTitle>
               <DialogDescription>

@@ -1,102 +1,115 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 
-interface UseSpeechRecognitionReturn {
-  transcript: string;
-  interimTranscript: string;
-  isListening: boolean;
-  startListening: () => void;
-  stopListening: () => void;
-  resetTranscript: () => void;
-  supported: boolean;
-}
-
-export function useSpeechRecognition(): UseSpeechRecognitionReturn {
-  const [transcript, setTranscript] = useState('');
-  const [interimTranscript, setInterimTranscript] = useState('');
+export function useSpeechRecognition() {
+  const [isAvailable, setIsAvailable] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
-  const supported = typeof window !== 'undefined' && 
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  const [transcript, setTranscript] = useState('');
 
   useEffect(() => {
-    if (!supported) return;
+    // Capacitorプラットフォームチェック
+    if (Capacitor.isNativePlatform()) {
+      // iOS/Androidネイティブの場合
+      checkNativeAvailability();
+    } else {
+      // Webの場合
+      checkWebAvailability();
+    }
+  }, []);
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = true;
-    recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'ja-JP';
+  const checkNativeAvailability = async () => {
+    try {
+      const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+      const { available } = await SpeechRecognition.available();
+      setIsAvailable(available);
+      
+      if (available) {
+        await SpeechRecognition.requestPermissions();
+      }
+    } catch (error) {
+      console.error('Native speech recognition check failed:', error);
+      setIsAvailable(false);
+    }
+  };
 
-    recognitionRef.current.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
+  const checkWebAvailability = () => {
+    const available = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    setIsAvailable(available);
+  };
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
+  const startListening = async () => {
+    if (!isAvailable) return;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        
+        await SpeechRecognition.start({
+          language: 'ja-JP',
+          maxResults: 1,
+          prompt: '話してください',
+          partialResults: true,
+          popup: false,
+        });
+
+        SpeechRecognition.addListener('partialResults', (data: any) => {
+          if (data.matches && data.matches.length > 0) {
+            setTranscript(prev => prev + ' ' + data.matches[0]);
+          }
+        });
+
+        setIsListening(true);
+      } catch (error) {
+        console.error('ネイティブ音声認識エラー:', error);
+      }
+    } else {
+      // Web実装
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ja-JP';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
         }
-      }
-
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
-      }
-      setInterimTranscript(interimTranscript);
-    };
-
-    recognitionRef.current.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-    };
-
-    recognitionRef.current.onend = () => {
-      setIsListening(false);
-    };
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [supported]);
-
-  const startListening = useCallback(() => {
-    if (!supported || !recognitionRef.current) return;
-
-    try {
-      recognitionRef.current.start();
+        if (finalTranscript) {
+          setTranscript(prev => prev + ' ' + finalTranscript);
+        }
+      };
+      
+      recognition.start();
       setIsListening(true);
-    } catch (error) {
-      console.error('Failed to start speech recognition:', error);
     }
-  }, [supported]);
+  };
 
-  const stopListening = useCallback(() => {
-    if (!recognitionRef.current) return;
+  const stopListening = async () => {
+    if (!isAvailable) return;
 
-    try {
-      recognitionRef.current.stop();
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        await SpeechRecognition.stop();
+        setIsListening(false);
+      } catch (error) {
+        console.error('音声認識停止エラー:', error);
+      }
+    } else {
+      // Web実装の停止処理
       setIsListening(false);
-    } catch (error) {
-      console.error('Failed to stop speech recognition:', error);
     }
-  }, []);
-
-  const resetTranscript = useCallback(() => {
-    setTranscript('');
-    setInterimTranscript('');
-  }, []);
+  };
 
   return {
-    transcript,
-    interimTranscript,
+    isAvailable,
     isListening,
+    transcript,
     startListening,
     stopListening,
-    resetTranscript,
-    supported,
+    clearTranscript: () => setTranscript(''),
   };
 }

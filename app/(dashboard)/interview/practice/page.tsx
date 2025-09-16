@@ -616,7 +616,6 @@ const AIQuestionGenerator = ({ onQuestionsGenerated, onClose }: {
       };
       
       onQuestionsGenerated([newQuestion]);
-      alert('新しい質問を生成しました！');
       
       // フォームをリセット
       setDepartment('');
@@ -872,7 +871,6 @@ export default function PracticePage() {
       await loadQuestions();
       
       // 成功メッセージ
-      alert('新しい質問をAIが生成し、保存しました！');
       
       // AI生成パネルを閉じる
       setShowAIGenerator(false);

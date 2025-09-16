@@ -1,4 +1,3 @@
-//middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -14,12 +13,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 削除されたパスへのリダイレクト
-  if (path.startsWith('/subscription') || path.startsWith('/payment')) {
+  // /subscription/onboardingは許可
+  if (path === '/subscription/onboarding') {
+    return NextResponse.next();
+  }
+
+  // その他の/subscriptionパスはリダイレクト
+  if (path.startsWith('/subscription') && path !== '/subscription/onboarding') {
     return NextResponse.redirect(new URL('/home', request.url));
   }
 
-  // 一時的に認証チェックを完全に無効化
+  // /paymentパスはリダイレクト
+  if (path.startsWith('/payment')) {
+    return NextResponse.redirect(new URL('/home', request.url));
+  }
+
   return NextResponse.next();
 }
 

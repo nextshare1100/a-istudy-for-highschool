@@ -25,12 +25,15 @@ const nextConfig = {
         hostname: 'lh3.googleusercontent.com',
       },
     ],
+    // Capacitor用の設定（常に画像最適化を無効化）
+    unoptimized: true,
   },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
     },
   },
+  // 動的ルートを保持（静的エクスポートしない）
 };
 
 module.exports = withPWA(nextConfig);

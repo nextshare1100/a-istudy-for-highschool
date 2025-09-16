@@ -4,11 +4,28 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import { Mic, PenTool, ChevronRight, Target, Clock, BarChart3 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore'
+import { db } from '@/lib/firebase/config'
+import { startOfToday } from 'date-fns'
+
+interface SecondaryExamStats {
+  interviewCount: number
+  essayCount: number
+  averageScore: number
+  consecutiveDays: number
+}
 
 export default function SecondaryExamPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
+  const [stats, setStats] = useState<SecondaryExamStats>({
+    interviewCount: 0,
+    essayCount: 0,
+    averageScore: 0,
+    consecutiveDays: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -18,6 +35,147 @@ export default function SecondaryExamPage() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Firebaseから統計データを取得
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) return
+      
+      setStatsLoading(true)
+      try {
+        // 面接練習回数を取得
+        const interviewQuery = query(
+          collection(db, 'interviewPractices'),
+          where('userId', '==', user.uid)
+        )
+        const interviewSnapshot = await getDocs(interviewQuery)
+        const interviewCount = interviewSnapshot.size
+
+        // 小論文作成数を取得
+        const essayQuery = query(
+          collection(db, 'essaySubmissions'),
+          where('userId', '==', user.uid)
+        )
+        const essaySnapshot = await getDocs(essayQuery)
+        const essayCount = essaySnapshot.size
+
+        // 平均評価スコアを計算
+        let totalScore = 0
+        let scoreCount = 0
+
+        // 面接の評価スコア
+        interviewSnapshot.forEach(doc => {
+          const data = doc.data()
+          if (data.evaluation?.totalScore) {
+            totalScore += data.evaluation.totalScore
+            scoreCount++
+          }
+        })
+
+        // 小論文の評価スコア
+        const evaluationQuery = query(
+          collection(db, 'essayEvaluations'),
+          where('userId', '==', user.uid)
+        )
+        const evaluationSnapshot = await getDocs(evaluationQuery)
+        evaluationSnapshot.forEach(doc => {
+          const data = doc.data()
+          if (data.totalScore) {
+            totalScore += data.totalScore
+            scoreCount++
+          }
+        })
+
+        const averageScore = scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0
+
+        // 連続練習日数を計算
+        const consecutiveDays = await calculateConsecutiveDays(user.uid)
+
+        setStats({
+          interviewCount,
+          essayCount,
+          averageScore,
+          consecutiveDays
+        })
+      } catch (error) {
+        console.error('Error loading stats:', error)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+
+    if (user) {
+      loadStats()
+    }
+  }, [user])
+
+  // 連続練習日数を計算する関数
+  const calculateConsecutiveDays = async (userId: string): Promise<number> => {
+    try {
+      // 過去30日分の練習データを取得
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      // 面接練習の日付を取得
+      const interviewQuery = query(
+        collection(db, 'interviewPractices'),
+        where('userId', '==', userId),
+        where('createdAt', '>=', thirtyDaysAgo),
+        orderBy('createdAt', 'desc')
+      )
+      const interviewSnapshot = await getDocs(interviewQuery)
+      
+      // 小論文の日付を取得
+      const essayQuery = query(
+        collection(db, 'essaySubmissions'),
+        where('userId', '==', userId),
+        where('createdAt', '>=', thirtyDaysAgo),
+        orderBy('createdAt', 'desc')
+      )
+      const essaySnapshot = await getDocs(essayQuery)
+
+      // 日付を集約
+      const practiceDates = new Set<string>()
+      
+      interviewSnapshot.forEach(doc => {
+        const data = doc.data()
+        if (data.createdAt) {
+          const date = data.createdAt.toDate()
+          practiceDates.add(date.toISOString().split('T')[0])
+        }
+      })
+
+      essaySnapshot.forEach(doc => {
+        const data = doc.data()
+        if (data.createdAt) {
+          const date = data.createdAt.toDate()
+          practiceDates.add(date.toISOString().split('T')[0])
+        }
+      })
+
+      // 連続日数を計算
+      const sortedDates = Array.from(practiceDates).sort().reverse()
+      let consecutiveDays = 0
+      const today = new Date().toISOString().split('T')[0]
+
+      for (let i = 0; i < sortedDates.length; i++) {
+        const expectedDate = new Date()
+        expectedDate.setDate(expectedDate.getDate() - i)
+        const expected = expectedDate.toISOString().split('T')[0]
+        
+        if (sortedDates[i] === expected || (i === 0 && sortedDates[i] === today)) {
+          consecutiveDays++
+        } else {
+          break
+        }
+      }
+
+      return consecutiveDays
+    } catch (error) {
+      console.error('Error calculating consecutive days:', error)
+      return 0
+    }
+  }
 
   if (loading) {
     return (
@@ -275,6 +433,25 @@ export default function SecondaryExamPage() {
           margin-top: ${isMobile ? '2px' : '4px'};
         }
         
+        .loading-skeleton {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: loading 1.5s infinite;
+          border-radius: 4px;
+          height: 32px;
+          width: 60px;
+          margin: 0 auto;
+        }
+        
+        @keyframes loading {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
+        }
+        
         /* アドバイスセクション */
         .advice-section {
           background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
@@ -417,19 +594,37 @@ export default function SecondaryExamPage() {
           <h2 className="section-title">練習実績</h2>
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-value">0</div>
+              {statsLoading ? (
+                <div className="loading-skeleton"></div>
+              ) : (
+                <div className="stat-value">{stats.interviewCount}</div>
+              )}
               <div className="stat-label">面接練習回数</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">0</div>
+              {statsLoading ? (
+                <div className="loading-skeleton"></div>
+              ) : (
+                <div className="stat-value">{stats.essayCount}</div>
+              )}
               <div className="stat-label">小論文作成数</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">--</div>
+              {statsLoading ? (
+                <div className="loading-skeleton"></div>
+              ) : (
+                <div className="stat-value">
+                  {stats.averageScore > 0 ? `${stats.averageScore}点` : '--'}
+                </div>
+              )}
               <div className="stat-label">平均評価スコア</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">0</div>
+              {statsLoading ? (
+                <div className="loading-skeleton"></div>
+              ) : (
+                <div className="stat-value">{stats.consecutiveDays}</div>
+              )}
               <div className="stat-label">連続練習日数</div>
             </div>
           </div>

@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, updatePassword, deleteUser } from 'firebase/auth'
 import { auth } from '@/lib/firebase/config'
 import { getUserProfile, updateUserProfile } from '@/lib/firebase/firestore'
+import { useSubscriptionSync } from '@/hooks/useSubscriptionSync'
+import { RestorePurchaseButton } from '@/components/restore-purchase-button'
+import { Capacitor } from '@capacitor/core'
 import { 
   User, 
   Bell, 
@@ -17,7 +20,12 @@ import {
   AlertCircle,
   Loader2,
   BarChart3,
-  ExternalLink
+  ExternalLink,
+  Clock,
+  CheckCircle,
+  RefreshCw,
+  Calendar,
+  CreditCard
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -80,7 +88,7 @@ const Button = ({
   className = ''
 }: {
   children: React.ReactNode,
-  variant?: 'default' | 'outline' | 'ghost' | 'destructive',
+  variant?: 'default' | 'outline' | 'ghost' | 'destructive' | 'gradient',
   size?: 'default' | 'sm',
   onClick?: () => void,
   disabled?: boolean,
@@ -120,6 +128,10 @@ const Button = ({
     destructive: {
       backgroundColor: '#dc2626',
       color: 'white',
+    },
+    gradient: {
+      background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+      color: 'white',
     }
   }
   
@@ -140,6 +152,8 @@ const Button = ({
             e.currentTarget.style.backgroundColor = '#f9fafb'
           } else if (variant === 'destructive') {
             e.currentTarget.style.backgroundColor = '#b91c1c'
+          } else if (variant === 'gradient') {
+            e.currentTarget.style.background = 'linear-gradient(to right, #2563eb, #7c3aed)'
           }
         }
       }}
@@ -151,6 +165,8 @@ const Button = ({
             e.currentTarget.style.backgroundColor = 'transparent'
           } else if (variant === 'destructive') {
             e.currentTarget.style.backgroundColor = '#dc2626'
+          } else if (variant === 'gradient') {
+            e.currentTarget.style.background = 'linear-gradient(to right, #3b82f6, #8b5cf6)'
           }
         }
       }}
@@ -498,6 +514,15 @@ export default function SettingsPage() {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
   const { toast } = useToast()
   const router = useRouter()
+  
+  // サブスクリプション状態を取得
+  const { 
+    subscription, 
+    loading: subscriptionLoading, 
+    syncing, 
+    error: subscriptionError,
+    syncSubscription 
+  } = useSubscriptionSync()
 
   const subjectCategories = {
     '国語': ['現代文', '古文', '漢文'],
@@ -705,22 +730,122 @@ export default function SettingsPage() {
   }
 
   const handleManageSubscription = () => {
-    // プラットフォームを検出（簡易的な判定）
-    const userAgent = navigator.userAgent.toLowerCase()
-    const isIOS = /iphone|ipad|ipod/.test(userAgent)
-    const isAndroid = /android/.test(userAgent)
-    
-    if (isIOS) {
-      // App Storeのサブスクリプション管理ページへ
+    if (subscription.platform === 'ios') {
       window.open('https://apps.apple.com/account/subscriptions', '_blank')
-    } else if (isAndroid) {
-      // Google Play Storeのサブスクリプション管理ページへ
+    } else if (subscription.platform === 'android') {
       window.open('https://play.google.com/store/account/subscriptions', '_blank')
     } else {
-      toast({
-        title: "お知らせ",
-        description: "モバイルデバイスからアクセスしてください",
-      })
+      // プラットフォームを検出
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isIOS = /iphone|ipad|ipod/.test(userAgent)
+      const isAndroid = /android/.test(userAgent)
+      
+      if (isIOS) {
+        window.open('https://apps.apple.com/account/subscriptions', '_blank')
+      } else if (isAndroid) {
+        window.open('https://play.google.com/store/account/subscriptions', '_blank')
+      } else {
+        router.push('/subscription/onboarding')
+      }
+    }
+  }
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return '---'
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(date)
+  }
+
+  const getStatusBadge = () => {
+    switch (subscription.status) {
+      case 'trial':
+        return (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#dbeafe',
+            color: '#1e40af',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: '500'
+          }}>
+            <Clock style={{ width: '14px', height: '14px' }} />
+            無料トライアル
+          </div>
+        )
+      case 'active':
+        return (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#d1fae5',
+            color: '#065f46',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: '500'
+          }}>
+            <CheckCircle style={{ width: '14px', height: '14px' }} />
+            有効
+          </div>
+        )
+      case 'cancelled':
+        return (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#fed7aa',
+            color: '#92400e',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: '500'
+          }}>
+            <AlertCircle style={{ width: '14px', height: '14px' }} />
+            キャンセル済み
+          </div>
+        )
+      case 'expired':
+        return (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#fee2e2',
+            color: '#991b1b',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: '500'
+          }}>
+            <AlertCircle style={{ width: '14px', height: '14px' }} />
+            期限切れ
+          </div>
+        )
+      default:
+        return (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#f3f4f6',
+            color: '#6b7280',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: '500'
+          }}>
+            <AlertCircle style={{ width: '14px', height: '14px' }} />
+            未登録
+          </div>
+        )
     }
   }
 
@@ -1049,71 +1174,316 @@ export default function SettingsPage() {
 
           {/* サブスクリプション */}
           <TabsContent value="subscription">
+            {/* 現在のプラン状態 */}
             <Card>
               <CardHeader>
                 <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Crown style={{ width: '18px', height: '18px' }} />
-                  サブスクリプション
+                  <Crown style={{ width: '18px', height: '18px', color: '#fbbf24' }} />
+                  サブスクリプション状態
                 </CardTitle>
                 <CardDescription>
-                  プランの管理はストアから行ってください
+                  現在のプランと有効期限を確認できます
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {subscriptionLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+                    <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite', color: '#9ca3af' }} />
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* ステータスバッジ */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.813rem', color: '#6b7280' }}>ステータス</span>
+                      {getStatusBadge()}
+                    </div>
+
+                    {/* プラン詳細 */}
+                    <div style={{
+                      padding: '0.75rem',
+                      background: subscription.isActive 
+                        ? 'linear-gradient(to right, #dbeafe, #e0e7ff)'
+                        : '#f3f4f6',
+                      borderRadius: '0.5rem',
+                      border: subscription.isActive 
+                        ? '1px solid #93c5fd'
+                        : '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        marginBottom: '0.375rem' 
+                      }}>
+                        <span style={{ fontSize: '1rem', fontWeight: '600' }}>
+                          {subscription.isActive ? 'A-IStudy プレミアム' : '無料プラン'}
+                        </span>
+                        {subscription.isActive && (
+                          <span style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                            ¥980<span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>/月</span>
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '0.75rem', color: '#4b5563' }}>
+                        {subscription.isActive 
+                          ? 'すべての学習機能をご利用いただけます'
+                          : '基本機能のみご利用いただけます'}
+                      </p>
+                    </div>
+
+                    {/* トライアル期間の表示 */}
+                    {subscription.isInTrial && subscription.trialDaysRemaining !== undefined && (
+                      <div style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#eff6ff',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #dbeafe'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Clock style={{ width: '16px', height: '16px', color: '#2563eb' }} />
+                          <div>
+                            <p style={{ 
+                              fontSize: '0.813rem', 
+                              fontWeight: '500', 
+                              color: '#1e40af',
+                              marginBottom: '0.125rem'
+                            }}>
+                              無料トライアル期間
+                            </p>
+                            <p style={{ fontSize: '0.75rem', color: '#3730a3' }}>
+                              残り{subscription.trialDaysRemaining}日（
+                              {subscription.expirationDate ? formatDate(subscription.expirationDate) : '---'}まで）
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 詳細情報 */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gap: '0.75rem',
+                      marginTop: '0.5rem'
+                    }}>
+                      <div>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.125rem' }}>
+                          プラットフォーム
+                        </p>
+                        <p style={{ fontSize: '0.813rem', fontWeight: '500' }}>
+                          {subscription.platform === 'ios' ? 'iOS (App Store)' :
+                           subscription.platform === 'android' ? 'Android (Google Play)' :
+                           Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'Web'}
+                        </p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.125rem' }}>
+                          自動更新
+                        </p>
+                        <p style={{ fontSize: '0.813rem', fontWeight: '500' }}>
+                          {subscription.autoRenewing ? 'オン' : 'オフ'}
+                        </p>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.125rem' }}>
+                          有効期限
+                        </p>
+                        <p style={{ fontSize: '0.813rem', fontWeight: '500' }}>
+                          {formatDate(subscription.expirationDate)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* エラー表示 */}
+                    {subscriptionError && (
+                      <div style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#fee2e2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '0.5rem'
+                      }}>
+                        <p style={{ fontSize: '0.75rem', color: '#dc2626' }}>
+                          {subscriptionError}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 期限切れ警告 */}
+                    {subscription.status === 'expired' && (
+                      <div style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#fef2f2',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #fecaca'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'start', gap: '0.5rem' }}>
+                          <AlertCircle style={{ width: '16px', height: '16px', color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
+                          <div>
+                            <p style={{ 
+                              fontSize: '0.813rem', 
+                              fontWeight: '500', 
+                              color: '#991b1b',
+                              marginBottom: '0.25rem'
+                            }}>
+                              サブスクリプションの有効期限が切れています
+                            </p>
+                            <p style={{ fontSize: '0.75rem', color: '#b91c1c' }}>
+                              プレミアム機能を利用するには、サブスクリプションを更新してください。
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* アクション */}
+            <Card style={{ marginTop: '0.75rem' }}>
+              <CardHeader>
+                <CardTitle>アクション</CardTitle>
+                <CardDescription>
+                  サブスクリプションの管理と同期
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* 同期ボタン */}
+                  {Capacitor.isNativePlatform() && (
+                    <div style={{
+                      padding: '0.75rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <div>
+                          <p style={{ fontSize: '0.813rem', fontWeight: '500', marginBottom: '0.125rem' }}>
+                            サブスクリプション情報を同期
+                          </p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            最新の購入情報を取得します
+                          </p>
+                        </div>
+                        <Button
+                          onClick={syncSubscription}
+                          disabled={syncing}
+                          size="sm"
+                          variant="outline"
+                        >
+                          {syncing ? (
+                            <>
+                              <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+                              同期中...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw style={{ width: '14px', height: '14px' }} />
+                              同期
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 購入復元 */}
+                  {Capacitor.isNativePlatform() && (
+                    <div style={{
+                      padding: '0.75rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <p style={{ fontSize: '0.813rem', fontWeight: '500', marginBottom: '0.125rem' }}>
+                          購入を復元
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                          以前の購入履歴を復元します
+                        </p>
+                      </div>
+                      <RestorePurchaseButton 
+                        onSuccess={() => {
+                          toast({
+                            title: "復元完了",
+                            description: "購入履歴が復元されました",
+                          })
+                        }}
+                        onError={(error) => {
+                          toast({
+                            title: "復元エラー",
+                            description: error,
+                            variant: "destructive",
+                          })
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* サブスクリプション管理 */}
                   <div style={{
                     padding: '0.75rem',
-                    background: 'linear-gradient(to right, #dbeafe, #e0e7ff)',
+                    backgroundColor: '#f9fafb',
                     borderRadius: '0.5rem',
-                    border: '1px solid #93c5fd'
+                    border: '1px solid #e5e7eb'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: '600' }}>A-IStudy プレミアム</span>
-                      <span style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                        ¥980<span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>/月</span>
-                      </span>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <p style={{ fontSize: '0.813rem', fontWeight: '500', marginBottom: '0.125rem' }}>
+                          サブスクリプションを管理
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                          {subscription.platform === 'ios' ? 'App Storeで管理' :
+                           subscription.platform === 'android' ? 'Google Playで管理' :
+                           'プラン変更やキャンセル'}
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleManageSubscription}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <ExternalLink style={{ width: '14px', height: '14px' }} />
+                        管理する
+                      </Button>
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: '#4b5563' }}>
-                      すべての学習機能をご利用いただけます
-                    </p>
                   </div>
 
-                  <div style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#f3f4f6',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.813rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                      <AlertCircle style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-                      <span style={{ fontWeight: '500', color: '#374151' }}>サブスクリプションの管理について</span>
+                  {/* プランアップグレード */}
+                  {!subscription.isActive && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <Button
+                        onClick={() => router.push('/subscription/onboarding')}
+                        variant="gradient"
+                        className="w-full"
+                      >
+                        <Crown style={{ width: '16px', height: '16px' }} />
+                        プレミアムプランにアップグレード
+                      </Button>
                     </div>
-                    <p style={{ color: '#6b7280', lineHeight: '1.5' }}>
-                      サブスクリプションの解約や変更は、お使いのデバイスのストアから行ってください。
-                      <br />
-                      • iPhone/iPad: App Storeの「サブスクリプション」
-                      <br />
-                      • Android: Google Play Storeの「定期購入」
-                    </p>
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleManageSubscription}
-                    size="sm"
-                  >
-                    <ExternalLink style={{ width: '14px', height: '14px' }} />
-                    ストアで管理する
-                  </Button>
+                  )}
 
+                  {/* 注意事項 */}
                   <div style={{
                     padding: '0.5rem',
                     backgroundColor: '#fef3c7',
                     borderRadius: '0.375rem',
-                    fontSize: '0.75rem'
+                    fontSize: '0.688rem'
                   }}>
                     <p style={{ color: '#92400e' }}>
-                      ※ アプリ内から直接解約することはできません
+                      ※ アプリ内から直接解約することはできません。
+                      ストアの「サブスクリプション」から管理してください。
                     </p>
                   </div>
                 </div>
