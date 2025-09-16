@@ -179,11 +179,20 @@ export function LoginForm() {
     setError('')
     setLoading(true)
 
+    console.log('[Login] Form submitted')
+    console.log('[Login] Environment:', {
+      isCapacitor: typeof window !== 'undefined' && (window as any).Capacitor,
+      platform: typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform?.(),
+      url: window.location.href
+    })
+
     try {
-      console.log('ログイン試行中...')
+      console.log('[Login] Attempting Firebase auth...')
+      console.log('[Login] Email:', email)
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
-      console.log('ログイン成功:', user.uid)
+      console.log('[Login] Auth successful:', user.uid)
       
       // 最終ログイン時刻を更新（エラーが出ても続行）
       try {
@@ -191,11 +200,11 @@ export function LoginForm() {
           lastLoginAt: serverTimestamp()
         })
       } catch (error) {
-        console.error('最終ログイン更新エラー:', error)
+        console.error('[Login] 最終ログイン更新エラー:', error)
       }
       
       // サブスクリプション状態をチェック
-      console.log('サブスクリプション状態を確認中...')
+      console.log('[Login] サブスクリプション状態を確認中...')
       const userDoc = await getDoc(doc(db, 'users', user.uid))
       const userData = userDoc.data()
       const subscription = userData?.subscription
@@ -205,7 +214,7 @@ export function LoginForm() {
       
       if (!hasActiveSubscription && !isInTrial) {
         // サブスクリプションがない場合は強制的にオンボーディングへ
-        console.log('サブスクリプションなし → オンボーディングへリダイレクト')
+        console.log('[Login] サブスクリプションなし → オンボーディングへリダイレクト')
         toast({
           title: 'プレミアムプランへの登録が必要です',
           description: '30日間の無料トライアルをお試しください',
@@ -213,7 +222,7 @@ export function LoginForm() {
         router.push('/subscription/onboarding')
       } else {
         // サブスクリプションがある場合は通常のリダイレクト
-        console.log('サブスクリプション確認済み → ホームへリダイレクト')
+        console.log('[Login] サブスクリプション確認済み → ホームへリダイレクト')
         toast({
           title: 'ログインしました',
           description: 'ホーム画面へ移動します',
@@ -222,7 +231,11 @@ export function LoginForm() {
       }
       
     } catch (err: any) {
-      console.error('Login error:', err)
+      console.error('[Login] Error details:', {
+        code: err.code,
+        message: err.message,
+        stack: err.stack
+      })
       
       // エラーメッセージの日本語化
       switch (err.code) {
@@ -252,6 +265,7 @@ export function LoginForm() {
       }
     } finally {
       setLoading(false)
+      console.log('[Login] Login process completed')
     }
   }
 

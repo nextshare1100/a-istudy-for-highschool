@@ -161,6 +161,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // 未認証ユーザーのリダイレクト
+  useEffect(() => {
+    if (!loading && !user) {
+      // 公開パスのリスト
+      const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/terms', '/privacy']
+      
+      if (!publicPaths.includes(pathname)) {
+        console.log('Not authenticated, redirecting to login')
+        router.push(`/login?redirect=${encodeURIComponent(pathname)}`)
+      }
+    }
+  }, [user, loading, pathname, router])
+
   // サブスクリプションチェックとリダイレクト
   useEffect(() => {
     if (!loading && user && userData) {
